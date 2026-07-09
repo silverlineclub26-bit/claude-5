@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Silver Line 銀線陪練桌</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <style>
+    html, body, #root { height: 100%; }
+    body { background: #020617; margin: 0; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: rgba(120,113,108,.4); border-radius: 3px; }
+    @keyframes dealIn { from { opacity: 0; transform: translateY(-8px) scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes potPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @keyframes winGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); } 50% { box-shadow: 0 0 16px 3px rgba(251,191,36,.55); } }
+    .deal-in { animation: dealIn .28s ease-out both; }
+    .pot-pulse { animation: potPulse .5s ease-out; }
+    .win-glow { animation: winGlow 1.4s ease-in-out infinite; border-radius: .5rem; }
+    input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #134e4a; outline: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
+    input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+const { useReducer, useEffect, useMemo, useRef, useState } = React;
+
+/* ============================================================
+   小型 SVG 圖示（取代 lucide-react，免額外相依）
+   ============================================================ */
+function Svg({ size = 16, children, ...p }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>{children}</svg>;
+}
+const Info = (p) => <Svg {...p}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></Svg>;
+const RefreshCw = (p) => <Svg {...p}><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" /></Svg>;
+const ChevronDown = (p) => <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>;
+const ChevronUp = (p) => <Svg {...p}><path d="m18 15-6-6-6 6" /></Svg>;
+const Coins = (p) => <Svg {...p}><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82" /></Svg>;
+const Trophy = (p) => <Svg {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z" /></Svg>;
+const X = (p) => <Svg {...p}><path d="M18 6 6 18M6 6l12 12" /></Svg>;
+const Heart = (p) => <Svg {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></Svg>;
+
+/* ============================================================
+   撲克核心邏輯
+   ============================================================ */
+const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS = ['s','h','d','c'];
+const SUIT_IDX = { s: 0, h: 1, d: 2, c: 3 };
+const SUIT_SYMBOL = { s: '♠', h: '♥', d: '♦', c: '♣' };
+const SUIT_RED = { s: false, h: true, d: true, c: false };
+
+function makeDeck() {
+  const deck = [];
+  for (let ri = 0; ri < RANKS.length; ri++) for (const s of SUITS) deck.push({ r: RANKS[ri], s, v: ri + 2 });
+  return deck;
+}
+function shuffle(deck) {
+  const d = deck.slice();
+  for (let i = d.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = d[i]; d[i] = d[j]; d[j] = t; }
+  return d;
+}
+
+/* --- 高速 7 張評估器：用位元遮罩，免 21 組合暴力比 --- */
+function ranksDesc(mask) { const r = []; for (let v = 14; v >= 2; v--) if (mask & (1 << v)) r.push(v); return r; }
+function straightHigh(mask) {
+  let m = mask;
+  if (m & (1 << 14)) m |= (1 << 1); // A 也當作 1，支援 A-2-3-4-5
+  for (let hi = 14; hi >= 5; hi--) {
+    let ok = true;
+    for (let k = 0; k < 5; k++) if (!(m & (1 << (hi - k)))) { ok = false; break; }
+    if (ok) return hi;
+  }
+  return 0;
+}
+function topN(mask, n, ...ex) {
+  const out = [];
+  for (let v = 14; v >= 2 && out.length < n; v--) { if (!(mask & (1 << v))) continue; if (ex.includes(v)) continue; out.push(v); }
+  return out;
+}
+// cards: 至少 5 張、通常 7 張 {v, s}。回傳可比較的分數陣列 [類別, 決勝...]
+function evalHand(cards) {
+  const suitCount = [0, 0, 0, 0];
+  const suitMask = [0, 0, 0, 0];
+  const rankCount = new Array(15).fill(0);
+  let rankMask = 0;
+  for (let i = 0; i < cards.length; i++) {
+    const c = cards[i], si = SUIT_IDX[c.s];
+    suitCount[si]++; suitMask[si] |= (1 << c.v); rankCount[c.v]++; rankMask |= (1 << c.v);
+  }
+  let flushSuit = -1;
+  for (let i = 0; i < 4; i++) if (suitCount[i] >= 5) flushSuit = i;
+  if (flushSuit >= 0) { const sf = straightHigh(suitMask[flushSuit]); if (sf) return [8, sf]; }
+
+  let quad = 0; const trips = [], pairs = [];
+  for (let v = 14; v >= 2; v--) {
+    const c = rankCount[v];
+    if (c === 4) quad = v; else if (c === 3) trips.push(v); else if (c === 2) pairs.push(v);
+  }
+  if (quad) return [7, quad, topN(rankMask, 1, quad)[0]];
+  if (trips.length >= 1 && (pairs.length >= 1 || trips.length >= 2)) {
+    const three = trips[0];
+    const pair = trips.length >= 2 ? trips[1] : pairs[0];
+    return [6, three, pair];
+  }
+  if (flushSuit >= 0) return [5, ...topN(suitMask[flushSuit], 5)];
+  const st = straightHigh(rankMask);
+  if (st) return [4, st];
+  if (trips.length >= 1) return [3, trips[0], ...topN(rankMask, 2, trips[0])];
+  if (pairs.length >= 2) return [2, pairs[0], pairs[1], ...topN(rankMask, 1, pairs[0], pairs[1])];
+  if (pairs.length === 1) return [1, pairs[0], ...topN(rankMask, 3, pairs[0])];
+  return [0, ...topN(rankMask, 5)];
+}
+function cmpHand(a, b) {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x - y; }
+  return 0;
+}
+function cardKey(c) { return c.r + c.s; }
+function removeUsed(deck, used) { const keys = new Set(used.map(cardKey)); return deck.filter(c => !keys.has(cardKey(c))); }
+
+// 蒙地卡羅勝率（已用高速評估器，可放心多跑幾次）
+const FULL_DECK = makeDeck();
+function equityVsN(heroCards, board, numOpp, iterations = 200) {
+  if (numOpp <= 0) return { win: 1, tie: 0 };
+  let wins = 0, ties = 0;
+  const base = removeUsed(FULL_DECK, [...heroCards, ...board]);
+  for (let it = 0; it < iterations; it++) {
+    const deck = shuffle(base);
+    let idx = 0;
+    const opps = [];
+    for (let o = 0; o < numOpp; o++) opps.push([deck[idx++], deck[idx++]]);
+    const runout = board.slice();
+    while (runout.length < 5) runout.push(deck[idx++]);
+    const h = evalHand([...heroCards, ...runout]);
+    let heroBest = true, tie = false;
+    for (let o = 0; o < opps.length; o++) {
+      const c = cmpHand(h, evalHand([...opps[o], ...runout]));
+      if (c < 0) { heroBest = false; break; }
+      if (c === 0) tie = true;
+    }
+    if (heroBest && !tie) wins++; else if (heroBest && tie) ties++;
+  }
+  return { win: wins / iterations, tie: ties / iterations };
+}
+
+/* --- Chen formula：翻前起手強度 --- */
+function rankPoints(v) { if (v === 14) return 10; if (v === 13) return 8; if (v === 12) return 7; if (v === 11) return 6; return v / 2; }
+function chenScore(c1, c2) {
+  const v1 = Math.max(c1.v, c2.v), v2 = Math.min(c1.v, c2.v);
+  const isPair = v1 === v2;
+  let score = isPair ? Math.max(rankPoints(v1) * 2, 5) : rankPoints(v1);
+  if (c1.s === c2.s && !isPair) score += 2;
+  if (!isPair) {
+    const gap = v1 - v2 - 1;
+    if (gap === 1) score -= 1; else if (gap === 2) score -= 2; else if (gap === 3) score -= 4; else if (gap >= 4) score -= 5;
+    if ((gap === 0 || gap === 1) && v1 <= 12) score += 1;
+  }
+  return Math.max(Math.ceil(score * 2) / 2, 0);
+}
+
+/* --- 位置 / 座位（N = 2,3,4）--- */
+function activeSeatsFromDealer(players, dealerIdx) {
+  const n = players.length, order = [];
+  for (let i = 0; i < n; i++) { const idx = (dealerIdx + i) % n; if (!players[idx].eliminated) order.push(idx); }
+  return order;
+}
+function roleLabels(numActive) {
+  if (numActive === 2) return ['BTN/SB', 'BB'];
+  if (numActive === 3) return ['BTN', 'SB', 'BB'];
+  return ['BTN', 'SB', 'BB', 'UTG'];
+}
+function actionOrders(seats) {
+  const n = seats.length;
+  if (n === 2) return { preflop: [seats[0], seats[1]], postflop: [seats[1], seats[0]] };
+  if (n === 3) return { preflop: [seats[0], seats[1], seats[2]], postflop: [seats[1], seats[2], seats[0]] };
+  return { preflop: [seats[3], seats[0], seats[1], seats[2]], postflop: [seats[1], seats[2], seats[3], seats[0]] };
+}
+function resolvePots(players) {
+  let remaining = players.filter(p => p.totalContributed > 0).map(p => ({ ...p }));
+  const pots = [];
+  while (remaining.length > 0) {
+    const minC = Math.min(...remaining.map(p => p.totalContributed));
+    const potAmount = minC * remaining.length;
+    const eligible = remaining.filter(p => !p.folded).map(p => p.idx);
+    pots.push({ amount: potAmount, eligible });
+    remaining = remaining.map(p => ({ ...p, totalContributed: p.totalContributed - minC })).filter(p => p.totalContributed > 0);
+  }
+  return pots;
+}
+function positionAdj(position) {
+  if (position === 'UTG') return 1.5;
+  if (position === 'BTN' || position === 'BTN/SB') return -1.5;
+  if (position === 'SB') return 0.5;
+  if (position === 'BB') return -1;
+  return 0;
+}
+
+/* ============================================================
+   常數
+   ============================================================ */
+const STARTING_STACK = 10000;
+const HANDS_PER_LEVEL = 8;
+const TOURNEY_SCHEDULE = [
+  { sb: 50, bb: 100, ante: 0 }, { sb: 75, bb: 150, ante: 0 }, { sb: 100, bb: 200, ante: 0 },
+  { sb: 150, bb: 300, ante: 25 }, { sb: 200, bb: 400, ante: 50 }, { sb: 300, bb: 600, ante: 75 },
+  { sb: 400, bb: 800, ante: 100 }, { sb: 500, bb: 1000, ante: 125 }, { sb: 600, bb: 1200, ante: 150 },
+  { sb: 800, bb: 1600, ante: 200 },
+];
+const CASH_BLINDS = { sb: 50, bb: 100, ante: 0 };
+const STYLE_LABEL = { tight: '緊', loose: '鬆', station: '跟注站' };
+
+function blindsForHand(mode, handNum) {
+  if (mode === 'cash') return CASH_BLINDS;
+  const level = Math.min(Math.floor(handNum / HANDS_PER_LEVEL), TOURNEY_SCHEDULE.length - 1);
+  return TOURNEY_SCHEDULE[level];
+}
+
+/* ============================================================
+   對手決策啟發式
+   ============================================================ */
+function baseThresholds(style) {
+  return {
+    open: style === 'tight' ? 8.5 : style === 'station' ? 6 : 6.5,
+    call: style === 'tight' ? 7 : style === 'station' ? 3.5 : 5,
+    raise: style === 'tight' ? 10 : style === 'station' ? 12 : 9,
+  };
+}
+function bluffFreq(style) { return style === 'tight' ? 0.05 : style === 'station' ? 0.02 : 0.18; }
+function valueFreq(style) { return style === 'station' ? 0.5 : 0.8; }
+
+function villainDecide(state, pIdx) {
+  const p = state.players[pIdx];
+  const callAmt = state.currentBet - p.committed;
+  const numOtherActive = state.players.filter((q, i) => i !== pIdx && !q.folded && !q.eliminated).length;
+  const posAdj = positionAdj(p.position);
+  const t = baseThresholds(p.style);
+  const open = t.open + posAdj, call = t.call + posAdj * 0.6, raise = t.raise + posAdj;
+
+  if (state.stage === 'preflop') {
+    const score = chenScore(p.cards[0], p.cards[1]);
+    const facingRaise = state.raiseCount > 0;
+    if (!facingRaise) {
+      if (score >= raise) return { type: 'raise', mult: 0.75 };
+      if (score >= open) return { type: callAmt === 0 ? 'check' : 'call' };
+      if (callAmt === 0) return { type: 'check' };
+      return score >= call - 2 ? { type: 'call' } : { type: 'fold' };
+    }
+    if (score >= raise) return { type: 'raise', mult: 1 };
+    if (score >= call) return { type: 'call' };
+    return { type: 'fold' };
+  }
+  const eq = equityVsN(p.cards, state.board, numOtherActive, 120);
+  const equity = eq.win + eq.tie * 0.5;
+  const potOddsNeeded = callAmt > 0 ? callAmt / (state.pot + callAmt) : 0;
+  if (callAmt <= 0) {
+    if (equity >= 0.65 && Math.random() < valueFreq(p.style)) return { type: 'bet', mult: 0.7 };
+    if (equity < 0.3 && Math.random() < bluffFreq(p.style)) return { type: 'bet', mult: 0.6 };
+    return { type: 'check' };
+  }
+  if (equity >= potOddsNeeded + 0.2 && Math.random() < valueFreq(p.style)) return { type: 'raise', mult: 1 };
+  if (equity >= potOddsNeeded + 0.03) return { type: 'call' };
+  return { type: 'fold' };
+}
+
+/* --- 起手牌強度百分位（載入時以蒙地卡羅算 vs 隨機一手後排名）--- */
+function handCode(cards) {
+  const a = cards[0], b = cards[1];
+  const hi = a.v >= b.v ? a : b, lo = a.v >= b.v ? b : a;
+  const H = RANKS[hi.v - 2], L = RANKS[lo.v - 2];
+  if (hi.v === lo.v) return H + H;
+  return H + L + (hi.s === lo.s ? 's' : 'o');
+}
+function repCards(code) {
+  const r1 = RANKS.indexOf(code[0]) + 2, r2 = RANKS.indexOf(code[1]) + 2;
+  if (code.length === 2) return [{ r: code[0], s: 's', v: r1 }, { r: code[1], s: 'h', v: r2 }];
+  const suited = code[2] === 's';
+  return [{ r: code[0], s: 's', v: r1 }, { r: code[1], s: suited ? 's' : 'h', v: r2 }];
+}
+const HAND_PCT = {'AA':0.003,'KK':0.009,'QQ':0.015,'JJ':0.021,'TT':0.027,'99':0.033,'88':0.038,'AKs':0.044,'77':0.05,'AQs':0.056,'AJs':0.062,'AKo':0.068,'AQo':0.074,'ATs':0.08,'KQs':0.086,'AJo':0.092,'ATo':0.098,'66':0.104,'KJs':0.109,'A9s':0.115,'KTs':0.121,'A8s':0.127,'KQo':0.133,'A9o':0.139,'A7s':0.145,'K9s':0.151,'KJo':0.157,'55':0.163,'A6s':0.169,'QJs':0.175,'A5s':0.18,'QTs':0.186,'KTo':0.192,'A8o':0.198,'A4s':0.204,'A7o':0.21,'K8s':0.216,'A6o':0.222,'A3s':0.228,'K9o':0.234,'QJo':0.24,'Q9s':0.246,'A5o':0.251,'K7s':0.257,'A2s':0.263,'QTo':0.269,'JTs':0.275,'A4o':0.281,'44':0.287,'K6s':0.293,'K8o':0.299,'J9s':0.305,'K5s':0.311,'Q8s':0.317,'A3o':0.322,'JTo':0.328,'K7o':0.334,'Q9o':0.34,'A2o':0.346,'Q7s':0.352,'J8s':0.358,'K4s':0.364,'K3s':0.37,'K6o':0.376,'T9s':0.382,'Q6s':0.388,'33':0.393,'K5o':0.399,'J9o':0.405,'Q8o':0.411,'K2s':0.417,'Q5s':0.423,'K4o':0.429,'J7s':0.435,'T8s':0.441,'Q4s':0.447,'T9o':0.453,'Q7o':0.459,'Q3s':0.464,'J8o':0.47,'K2o':0.476,'Q6o':0.482,'J6s':0.488,'98s':0.494,'K3o':0.5,'22':0.506,'T7s':0.512,'Q5o':0.518,'J5s':0.524,'Q2s':0.53,'J7o':0.536,'T8o':0.541,'97s':0.547,'Q4o':0.553,'J4s':0.559,'T6s':0.565,'J3s':0.571,'Q3o':0.577,'98o':0.583,'T5s':0.589,'J2s':0.595,'96s':0.601,'87s':0.607,'T7o':0.612,'J6o':0.618,'J5o':0.624,'Q2o':0.63,'86s':0.636,'T4s':0.642,'97o':0.648,'T6o':0.654,'J4o':0.66,'T3s':0.666,'95s':0.672,'76s':0.678,'J2o':0.683,'87o':0.689,'J3o':0.695,'85s':0.701,'T2s':0.707,'96o':0.713,'T5o':0.719,'T4o':0.725,'84s':0.731,'94s':0.737,'93s':0.743,'86o':0.749,'65s':0.754,'75s':0.76,'95o':0.766,'T3o':0.772,'76o':0.778,'54s':0.784,'92s':0.79,'64s':0.796,'85o':0.802,'T2o':0.808,'74s':0.814,'94o':0.82,'75o':0.825,'83s':0.831,'65o':0.837,'82s':0.843,'73s':0.849,'93o':0.855,'84o':0.861,'53s':0.867,'63s':0.873,'92o':0.879,'43s':0.885,'74o':0.891,'62s':0.896,'64o':0.902,'54o':0.908,'72s':0.914,'52s':0.92,'83o':0.926,'42s':0.932,'82o':0.938,'32s':0.944,'63o':0.95,'53o':0.956,'73o':0.962,'43o':0.967,'72o':0.973,'52o':0.979,'62o':0.985,'42o':0.991,'32o':0.997};
+
+/* --- 依動作推測對手範圍，對範圍算勝率 --- */
+function oppCutoff(opp, bb) {
+  if (opp.aggro >= 3) return 0.14;
+  if (opp.aggro === 2) return 0.22;
+  if (opp.aggro === 1) return 0.40;
+  if (opp.totalContributed > bb) return 0.62; // 自願跟注但未進攻
+  return 0.90;                                // 只補盲注 / 免費看牌
+}
+function equityVsRange(heroCards, board, cutoffs, iterations = 220) {
+  if (cutoffs.length === 0) return { win: 1, tie: 0 };
+  const base = removeUsed(FULL_DECK, [...heroCards, ...board]);
+  let wins = 0, ties = 0, valid = 0;
+  for (let it = 0; it < iterations; it++) {
+    const deck = shuffle(base);
+    const consumed = new Set();
+    let ci = 0, ok = true;
+    const opps = [];
+    for (const cut of cutoffs) {
+      let picked = null;
+      for (let a = 0; a < 12 && ci < deck.length - 1; a++) {
+        const c1 = deck[ci], c2 = deck[ci + 1];
+        if (consumed.has(cardKey(c1)) || consumed.has(cardKey(c2))) { ci++; continue; }
+        if (HAND_PCT[handCode([c1, c2])] <= cut || a === 11) { picked = [c1, c2]; ci += 2; break; }
+        ci++;
+      }
+      if (!picked) { ok = false; break; }
+      consumed.add(cardKey(picked[0])); consumed.add(cardKey(picked[1]));
+      opps.push(picked);
+    }
+    if (!ok) continue;
+    const runout = board.slice();
+    for (let k = 0; k < deck.length && runout.length < 5; k++) if (!consumed.has(cardKey(deck[k]))) runout.push(deck[k]);
+    const h = evalHand([...heroCards, ...runout]);
+    let best = true, tie = false;
+    for (const o of opps) { const c = cmpHand(h, evalHand([...o, ...runout])); if (c < 0) { best = false; break; } if (c === 0) tie = true; }
+    valid++;
+    if (best && !tie) wins++; else if (best && tie) ties++;
+  }
+  if (valid === 0) return { win: 0.5, tie: 0 };
+  return { win: wins / valid, tie: ties / valid };
+}
+
+/* --- 位置範圍門檻（前 X% 起手牌）--- */
+const OPEN_PCT = { UTG: 0.16, BTN: 0.46, SB: 0.42, 'BTN/SB': 0.72, BB: 0.35 };
+const THREEBET_PCT = { UTG: 0.045, BTN: 0.075, SB: 0.06, 'BTN/SB': 0.11, BB: 0.055 };
+const CALL_PCT = { UTG: 0.11, BTN: 0.24, SB: 0.15, 'BTN/SB': 0.34, BB: 0.30 };
+function pushThreshold(pos, effBB, facingAllIn) {
+  if (facingAllIn) return ({ UTG: 0.06, SB: 0.10, BB: 0.14, BTN: 0.12, 'BTN/SB': 0.16 }[pos]) || 0.10;
+  const wide = Math.max(0, Math.min(1, (12 - effBB) / 9));
+  const posBase = ({ UTG: 0.12, SB: 0.30, BB: 0.22, BTN: 0.34, 'BTN/SB': 0.46 }[pos]) || 0.22;
+  return posBase + wide * (0.88 - posBase);
+}
+
+function computeAdvice(state) {
+  if (!state.actingOrder || state.actingOrder.length === 0) return null;
+  const actorIdx = state.actingOrder[state.actIdxPtr % state.actingOrder.length];
+  if (actorIdx !== 0) return null;
+  const hero = state.players[0];
+  if (!hero.cards || hero.cards.length < 2) return null;
+  const callAmt = state.currentBet - hero.committed;
+  const oppsIn = state.players.filter((q, i) => i !== 0 && !q.folded && !q.eliminated);
+  const numOpp = oppsIn.length;
+  const bb = state.bb;
+
+  if (state.stage === 'preflop') {
+    const code = handCode(hero.cards);
+    const pct = HAND_PCT[code];
+    const topPct = Math.max(1, Math.round(pct * 100));
+    const pos = hero.position;
+    const eq = equityVsN(hero.cards, [], numOpp, 140);
+    const equity = Math.round((eq.win + eq.tie * 0.5) * 100);
+    const oppStacks = oppsIn.map(o => o.stack + o.committed);
+    const effBB = (oppStacks.length ? Math.min(hero.stack + hero.committed, Math.max(...oppStacks)) : hero.stack) / bb;
+    const facingRaise = state.raiseCount > 0;
+    let action, reasoning;
+
+    if (effBB <= 12) {
+      const thr = pushThreshold(pos, effBB, facingRaise);
+      if (pct <= thr) { action = '全下 All-in'; reasoning = `有效籌碼僅 ${effBB.toFixed(1)}bb，屬短碼推/棄。${code} 落在 ${pos} 推牌範圍（前 ${Math.round(thr * 100)}%）內，直接全下最佳。`; }
+      else { action = callAmt === 0 ? '過牌' : '棄牌'; reasoning = `有效籌碼 ${effBB.toFixed(1)}bb，${code}（前 ${topPct}%）未達 ${pos} 短碼推牌門檻（前 ${Math.round(thr * 100)}%），${callAmt === 0 ? '過牌看牌' : '棄牌'}為佳。`; }
+      return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB) };
+    }
+
+    if (!facingRaise) {
+      const openP = OPEN_PCT[pos] ?? 0.4;
+      if (pct <= openP) { action = pos === 'BB' && callAmt === 0 ? '加注（隔離）' : '加注（open）'; reasoning = `${pos} 位置，${code} 落在前 ${topPct}%，在開池範圍（前 ${Math.round(openP * 100)}%）內，主動加注建立主動權。`; }
+      else { action = callAmt === 0 ? '過牌' : '棄牌'; reasoning = `${pos} 位置，${code}（前 ${topPct}%）超出開池範圍（前 ${Math.round(openP * 100)}%），${callAmt === 0 ? '過牌免費看翻牌' : '棄牌'}。`; }
+    } else {
+      const tb = THREEBET_PCT[pos] ?? 0.06, cp = CALL_PCT[pos] ?? 0.2;
+      if (pct <= tb) { action = '3-bet 加注'; reasoning = `面對加注，${code}（前 ${topPct}%）落在 ${pos} 的價值 3-bet 範圍（前 ${Math.round(tb * 100)}%），再加注施壓。`; }
+      else if (pct <= cp) { action = '跟注'; reasoning = `面對加注，${code}（前 ${topPct}%）在 ${pos} 跟注範圍（前 ${Math.round(cp * 100)}%），跟注看翻牌。`; }
+      else { action = '棄牌'; reasoning = `面對加注，${code}（前 ${topPct}%）超出 ${pos} 續戰範圍（跟注前 ${Math.round(cp * 100)}%），棄牌。`; }
+    }
+    return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB) };
+  }
+
+  // 翻後：對對手推測範圍算勝率
+  const cutoffs = oppsIn.map(o => oppCutoff(o, bb));
+  const eq = equityVsRange(hero.cards, state.board, cutoffs, 300);
+  const equity = Math.round((eq.win + eq.tie * 0.5) * 100);
+  const potOddsNeeded = callAmt > 0 ? Math.round((callAmt / (state.pot + callAmt)) * 100) : 0;
+  const readTag = numOpp === 1 ? (cutoffs[0] <= 0.25 ? '（對手動作偏強、範圍收窄）' : cutoffs[0] <= 0.45 ? '（對手範圍中等）' : '（對手範圍偏寬）') : `（對 ${numOpp} 位推測範圍）`;
+  let action, reasoning;
+  if (callAmt <= 0) {
+    if (equity >= 62) { const size = Math.round((state.pot * 0.66) / 10) * 10; const mdf = Math.round((1 - 0.66 / 1.66) * 100); action = '下注（價值 ⅔ 池）'; reasoning = `${readTag}勝率約 ${equity}%，領先明顯，主動下注約 ${size}（⅔ 池）拿價值；對手需防守 MDF ≈ ${mdf}%。`; }
+    else { action = '過牌'; reasoning = `${readTag}勝率約 ${equity}%，不足以下注拿價值，過牌控池較穩健。`; }
+  } else {
+    if (equity >= potOddsNeeded + 18) { action = '加注（價值）'; reasoning = `${readTag}勝率 ${equity}% 遠高於所需底池賠率 ${potOddsNeeded}%，加注放大價值。`; }
+    else if (equity >= potOddsNeeded + 2) { action = '跟注'; reasoning = `${readTag}勝率 ${equity}% 高於所需底池賠率 ${potOddsNeeded}%，跟注為正期望值。`; }
+    else { action = '棄牌'; reasoning = `${readTag}勝率 ${equity}% 低於所需底池賠率 ${potOddsNeeded}%，長期負期望，建議棄牌。`; }
+  }
+  return { action, equity, potOddsNeeded, reasoning, position: hero.position, numOpp };
+}
+
+/* ============================================================
+   Reducer
+   ============================================================ */
+const initialState = {
+  screen: 'lobby', mode: 'cash', handNum: 0, dealerIdx: 0,
+  sb: 50, bb: 100, ante: 0,
+  players: [],
+  board: [], deck: [], pot: 0, stage: 'idle',
+  actingOrder: [], actIdxPtr: 0, currentBet: 0, lastRaiserIdx: null, raiseCount: 0, lastRaiseSize: 0,
+  feed: [], history: [], decisionLog: [], lastReview: null,
+  finishOrder: [], gameOver: false, winners: [], showAdvice: true,
+  stats: { hands: 0, aligned: 0, deviated: 0 },
+};
+
+function makePlayers() {
+  const styles = ['tight', 'loose', 'station'];
+  const base = { stack: STARTING_STACK, cards: [], folded: false, allIn: false, committed: 0, totalContributed: 0, hasActed: false, eliminated: false, position: '', aggro: 0 };
+  return [
+    { idx: 0, name: '你', isHero: true, style: null, ...base },
+    { idx: 1, name: '對手A', isHero: false, style: styles[0], ...base },
+    { idx: 2, name: '對手B', isHero: false, style: styles[1], ...base },
+    { idx: 3, name: '對手C', isHero: false, style: styles[2], ...base },
+  ];
+}
+
+function startNewHand(state) {
+  if (state.mode === 'tournament') {
+    const heroP = state.players[0];
+    if (heroP && heroP.eliminated) return { ...state, stage: 'gameover', gameOver: true };
+    const activeCount = state.players.filter(p => !p.eliminated).length;
+    if (state.handNum > 0 && activeCount === 1) return { ...state, stage: 'gameover', gameOver: true, placement: 1 };
+  }
+  const handNum = state.handNum + 1;
+  const { sb, bb, ante } = blindsForHand(state.mode, handNum);
+
+  let dealerIdx;
+  if (state.handNum === 0) dealerIdx = state.players.findIndex(p => !p.eliminated);
+  else { let d = (state.dealerIdx + 1) % 4; while (state.players[d].eliminated) d = (d + 1) % 4; dealerIdx = d; }
+
+  let players = state.players.map(p => ({ ...p, cards: [], folded: p.eliminated, allIn: false, committed: 0, totalContributed: 0, hasActed: false, position: '', aggro: 0 }));
+  let deck = shuffle(makeDeck());
+  let cursor = 0;
+  for (const p of players) { if (!p.eliminated) { p.cards = [deck[cursor], deck[cursor + 1]]; cursor += 2; } }
+  deck = deck.slice(cursor);
+
+  const seats = activeSeatsFromDealer(players, dealerIdx);
+  const labels = roleLabels(seats.length);
+  seats.forEach((seatIdx, i) => { players[seatIdx].position = labels[i]; });
+
+  let pot = 0;
+  const feed = [`— 第 ${handNum} 手（${seats.length} 人桌）—`];
+  if (ante > 0) {
+    for (const p of players) { if (p.eliminated) continue; const a = Math.min(ante, p.stack); p.stack -= a; pot += a; p.totalContributed += a; }
+    feed.push(`每位玩家投入前注 ${ante}`);
+  }
+  const n = seats.length;
+  const sbSeat = n === 2 ? seats[0] : seats[1];
+  const bbSeat = n === 2 ? seats[1] : seats[2];
+  const sbPay = Math.min(sb, players[sbSeat].stack);
+  const bbPay = Math.min(bb, players[bbSeat].stack);
+  players[sbSeat].stack -= sbPay; players[sbSeat].committed = sbPay; players[sbSeat].totalContributed += sbPay;
+  if (players[sbSeat].stack === 0) players[sbSeat].allIn = true;
+  players[bbSeat].stack -= bbPay; players[bbSeat].committed = bbPay; players[bbSeat].totalContributed += bbPay;
+  if (players[bbSeat].stack === 0) players[bbSeat].allIn = true;
+  pot += sbPay + bbPay;
+  feed.push(`${players[sbSeat].name}（小盲）投入 ${sbPay}，${players[bbSeat].name}（大盲）投入 ${bbPay}`);
+
+  const orders = actionOrders(seats);
+  const actingOrder = orders.preflop.filter(i => !players[i].eliminated && !players[i].allIn);
+
+  return {
+    ...state, handNum, sb, bb, ante, dealerIdx, players, deck, board: [], pot,
+    stage: 'preflop', actingOrder, actIdxPtr: 0, currentBet: bbPay, lastRaiserIdx: bbSeat, raiseCount: 0, lastRaiseSize: bbPay,
+    feed, decisionLog: [], lastReview: null, screen: 'table', winners: [],
+  };
+}
+
+function findNextActor(state) {
+  const order = state.actingOrder;
+  let i = state.actIdxPtr;
+  for (let step = 0; step < order.length; step++) {
+    i = (i + 1) % order.length;
+    const p = state.players[order[i]];
+    if (!p.folded && !p.allIn) return i;
+  }
+  return null;
+}
+function isRoundComplete(state) {
+  const contenders = state.players.filter(p => !p.folded && !p.eliminated);
+  if (contenders.length <= 1) return true;
+  const decisionMakers = contenders.filter(p => !p.allIn);
+  if (decisionMakers.length === 0) return true;
+  return decisionMakers.every(p => p.hasActed && p.committed === state.currentBet);
+}
+function dealStreetCards(deck, board, stage) {
+  if (stage === 'preflop') return { board: [...board, deck[0], deck[1], deck[2]], deck: deck.slice(3), newStage: 'flop' };
+  if (stage === 'flop') return { board: [...board, deck[0]], deck: deck.slice(1), newStage: 'turn' };
+  if (stage === 'turn') return { board: [...board, deck[0]], deck: deck.slice(1), newStage: 'river' };
+  return { board, deck, newStage: 'showdown' };
+}
+function advanceStreet(state) {
+  const contenders = state.players.filter(p => !p.folded && !p.eliminated);
+  if (contenders.length <= 1 || state.stage === 'river') return resolveHand(state);
+
+  const { board, deck, newStage } = dealStreetCards(state.deck, state.board, state.stage);
+  const players = state.players.map(p => ({ ...p, committed: 0, hasActed: p.folded || p.eliminated || p.allIn }));
+  const label = newStage === 'flop' ? '翻牌' : newStage === 'turn' ? '轉牌' : '河牌';
+  const shown = board.slice(newStage === 'flop' ? 0 : board.length - 1).map(c => c.r + SUIT_SYMBOL[c.s]).join(' ');
+  const feed = [...state.feed, `— ${label}：${shown} —`];
+
+  const decisionMakers = players.filter(p => !p.folded && !p.eliminated && !p.allIn);
+  if (decisionMakers.length <= 1) {
+    return advanceStreet({ ...state, board, deck, stage: newStage, players, feed, currentBet: 0, lastRaiserIdx: null, raiseCount: 0, lastRaiseSize: state.bb });
+  }
+  const seats = activeSeatsFromDealer(players, state.dealerIdx);
+  const orders = actionOrders(seats);
+  const actingOrder = orders.postflop.filter(i => !players[i].folded && !players[i].eliminated && !players[i].allIn);
+
+  return { ...state, board, deck, stage: newStage, players, feed, currentBet: 0, lastRaiserIdx: null, raiseCount: 0, lastRaiseSize: state.bb, actingOrder, actIdxPtr: 0 };
+}
+function bucket(t) { if (t === '棄牌') return 'fold'; if (t === '過牌' || t === '跟注') return 'cc'; return 'br'; }
+function coachReview(preState, finalPlayers) {
+  const heroWon = finalPlayers[0].stack > preState.players[0].stack;
+  const lines = [];
+  const log = preState.decisionLog;
+  const deviations = log.filter(d => bucket(d.adviceAction) !== bucket(d.heroAction));
+  if (log.length === 0) lines.push('這手你沒有輪到需要決策的時刻。');
+  else if (deviations.length === 0) lines.push('這手每個決策方向都跟系統建議一致，紀律掌握得不錯。');
+  else for (const d of deviations.slice(0, 3)) lines.push(`${d.streetLabel}（${d.position}）：你選擇「${d.heroAction}」，建議是「${d.adviceAction}」。${d.reasoning}`);
+  if (deviations.length > 0) {
+    lines.push(heroWon
+      ? '這手結果是贏的，但採用了偏離建議的決策；長期期望值不一定站得住，建議以決策品質為主而非單手輸贏。'
+      : '這手輸了，其中偏離建議的決策值得回顧，想想是否要調整判斷標準。');
+  } else if (!heroWon) {
+    lines.push('決策採用跟建議一致，這手單純是運氣不站在你這邊，不需要懷疑打法。');
+  }
+  return lines;
+}
+function resolveHand(state) {
+  const contenders = state.players.filter(p => !p.folded && !p.eliminated);
+  let players = state.players.map(p => ({ ...p }));
+  let resultLines = [];
+  let winners = [];
+
+  if (contenders.length === 1) {
+    const w = contenders[0];
+    players[w.idx].stack += state.pot; winners = [w.idx];
+    resultLines.push(`${w.name} 未攤牌贏得 ${state.pot} 籌碼（其餘玩家棄牌）`);
+  } else {
+    const potInputs = state.players.filter(p => p.totalContributed > 0).map(p => ({ idx: p.idx, totalContributed: p.totalContributed, folded: p.folded }));
+    const pots = resolvePots(potInputs);
+    for (const pot of pots) {
+      if (pot.eligible.length === 0) continue;
+      if (pot.eligible.length === 1) { players[pot.eligible[0]].stack += pot.amount; winners.push(pot.eligible[0]); resultLines.push(`${players[pot.eligible[0]].name} 獨得 ${pot.amount} 邊池`); continue; }
+      const hands = pot.eligible.map(idx => ({ idx, score: evalHand([...state.players[idx].cards, ...state.board]) }));
+      hands.sort((a, b) => cmpHand(b.score, a.score));
+      const best = hands[0].score;
+      const potWinners = hands.filter(h => cmpHand(h.score, best) === 0).map(h => h.idx);
+      const share = Math.floor(pot.amount / potWinners.length);
+      let remainder = pot.amount - share * potWinners.length;
+      for (const w of potWinners) { players[w].stack += share + (remainder > 0 ? 1 : 0); if (remainder > 0) remainder--; winners.push(w); }
+      resultLines.push(`底池 ${pot.amount}：${potWinners.map(w => players[w].name).join(' / ')} 獲勝`);
+    }
+  }
+
+  let finishOrder = [...state.finishOrder];
+  if (state.mode === 'tournament') {
+    for (const p of players) { if (!p.eliminated && p.stack <= 0) { p.eliminated = true; finishOrder.push(p.idx); } }
+  } else {
+    for (const p of players) { if (p.stack <= 0) p.stack = STARTING_STACK; }
+  }
+
+  const history = [...state.history, {
+    handNum: state.handNum,
+    hero: state.players[0].cards.map(c => c.r + SUIT_SYMBOL[c.s]).join(' '),
+    board: state.board.map(c => c.r + SUIT_SYMBOL[c.s]).join(' '),
+    pot: state.pot, result: resultLines.join('；'),
+  }];
+  const review = coachReview(state, players);
+
+  // 統計：對齊 / 偏離
+  const dev = state.decisionLog.filter(d => bucket(d.adviceAction) !== bucket(d.heroAction)).length;
+  const aligned = state.decisionLog.length - dev;
+  const stats = { hands: state.stats.hands + 1, aligned: state.stats.aligned + aligned, deviated: state.stats.deviated + dev };
+
+  return { ...state, players, history, stage: 'handover', lastReview: review, finishOrder, winners, stats, feed: [...state.feed, ...resultLines] };
+}
+function amountFor(mult, pot, maxTotal) { if (mult === 'allin') return maxTotal; return Math.min(Math.round(pot * mult / 10) * 10, maxTotal); }
+
+function applyAction(state, decision) {
+  const order = state.actingOrder;
+  const actorIdx = order[state.actIdxPtr % order.length];
+  const p = state.players[actorIdx];
+  let players = state.players.map(q => ({ ...q }));
+  let pot = state.pot, feed = [...state.feed], currentBet = state.currentBet, lastRaiserIdx = state.lastRaiserIdx, raiseCount = state.raiseCount, lastRaiseSize = state.lastRaiseSize;
+  let decisionLog = state.decisionLog;
+
+  if (actorIdx === 0) {
+    const advice = computeAdvice(state);
+    if (advice) {
+      const label = decision.type === 'fold' ? '棄牌' : decision.type === 'check' ? '過牌' : decision.type === 'call' ? '跟注' : decision.type === 'raise' ? '加注' : '下注';
+      decisionLog = [...decisionLog, {
+        streetLabel: state.stage === 'preflop' ? '翻前' : state.stage === 'flop' ? '翻牌' : state.stage === 'turn' ? '轉牌' : '河牌',
+        position: p.position, adviceAction: advice.action, heroAction: label, reasoning: advice.reasoning,
+      }];
+    }
+  }
+
+  const callAmt = currentBet - p.committed;
+  if (decision.type === 'fold') { players[actorIdx].folded = true; players[actorIdx].hasActed = true; feed.push(`${p.name} 棄牌`); }
+  else if (decision.type === 'check') { players[actorIdx].hasActed = true; feed.push(`${p.name} 過牌`); }
+  else if (decision.type === 'call') {
+    const pay = Math.min(callAmt, players[actorIdx].stack);
+    players[actorIdx].stack -= pay; players[actorIdx].committed += pay; players[actorIdx].totalContributed += pay;
+    if (players[actorIdx].stack === 0) players[actorIdx].allIn = true;
+    players[actorIdx].hasActed = true; pot += pay;
+    feed.push(`${p.name} 跟注 ${pay}${players[actorIdx].allIn ? '（all-in）' : ''}`);
+  } else if (decision.type === 'bet' || decision.type === 'raise') {
+    const maxTotal = players[actorIdx].stack + players[actorIdx].committed;
+    let targetTotal = decision.amount != null ? decision.amount : amountFor(decision.mult, Math.max(pot, state.bb * 2), maxTotal);
+    const minRaiseTo = Math.min(currentBet + Math.max(lastRaiseSize, state.bb), maxTotal);
+    let newCommit = Math.max(targetTotal, minRaiseTo);
+    newCommit = Math.min(newCommit, maxTotal);
+    const pay = newCommit - players[actorIdx].committed;
+    const raiseSize = newCommit - currentBet;
+    players[actorIdx].stack -= pay; players[actorIdx].committed = newCommit; players[actorIdx].totalContributed += pay;
+    if (players[actorIdx].stack === 0) players[actorIdx].allIn = true;
+    players[actorIdx].hasActed = true; pot += pay; currentBet = newCommit; lastRaiserIdx = actorIdx; raiseCount += 1;
+    players[actorIdx].aggro = (players[actorIdx].aggro || 0) + 1;
+    if (raiseSize > 0) lastRaiseSize = raiseSize;
+    for (const q of players) { if (q.idx !== actorIdx && !q.folded && !q.eliminated && !q.allIn) q.hasActed = false; }
+    feed.push(`${p.name} ${decision.type === 'bet' ? '下注' : '加注'} 至 ${newCommit}${players[actorIdx].allIn ? '（all-in）' : ''}`);
+  }
+
+  let newState = { ...state, players, pot, feed, currentBet, lastRaiserIdx, raiseCount, lastRaiseSize, decisionLog };
+  const contenders = players.filter(q => !q.folded && !q.eliminated);
+  if (contenders.length <= 1) return resolveHand(newState);
+  if (isRoundComplete(newState)) return advanceStreet(newState);
+  const nextPtr = findNextActor(newState);
+  if (nextPtr === null) return advanceStreet(newState);
+  return { ...newState, actIdxPtr: nextPtr };
+}
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'START_SESSION':
+      return startNewHand({ ...initialState, players: makePlayers(), mode: action.mode, showAdvice: state.showAdvice, stats: { hands: 0, aligned: 0, deviated: 0 } });
+    case 'NEW_HAND':
+      if (state.mode === 'cash' && state.players[0].stack <= 0) return { ...state, stage: 'gameover', gameOver: true };
+      return startNewHand(state);
+    case 'REBUY':
+      return startNewHand({ ...state, players: state.players.map(p => ({ ...p, stack: STARTING_STACK, eliminated: false })), gameOver: false, finishOrder: [], handNum: 0, dealerIdx: 0 });
+    case 'TO_LOBBY': return { ...initialState, showAdvice: state.showAdvice };
+    case 'TOGGLE_ADVICE': return { ...state, showAdvice: !state.showAdvice };
+    case 'HERO_ACT': {
+      const order = state.actingOrder;
+      const actorIdx = order[state.actIdxPtr % order.length];
+      if (actorIdx !== 0) return state;
+      return applyAction(state, action.decision);
+    }
+    case 'BOT_ACT': {
+      const order = state.actingOrder;
+      const actorIdx = order[state.actIdxPtr % order.length];
+      if (actorIdx === 0 || actorIdx === undefined) return state;
+      return applyAction(state, villainDecide(state, actorIdx));
+    }
+    default: return state;
+  }
+}
+
+/* ============================================================
+   UI 元件
+   ============================================================ */
+function CardFace({ card, hidden, size = 'md', dim, animate }) {
+  const dims = size === 'lg' ? 'w-12 h-[4.3rem] text-lg' : size === 'sm' ? 'w-7 h-10 text-[10px]' : 'w-9 h-13 text-sm';
+  const anim = animate ? 'deal-in' : '';
+  if (hidden) {
+    return <div className={`${dims} ${anim} rounded-md bg-gradient-to-br from-emerald-800 to-emerald-950 border border-amber-600/40 flex items-center justify-center shadow-md ${dim ? 'opacity-40' : ''}`}>
+      <span className="text-amber-500/70 font-bold text-[8px] tracking-widest" style={{ fontFamily: "'Fraunces', serif" }}>SIL</span>
+    </div>;
+  }
+  const red = SUIT_RED[card.s];
+  return (
+    <div className={`${dims} ${anim} rounded-md bg-stone-50 border border-stone-300 flex flex-col items-center justify-center shadow-md font-semibold leading-none ${dim ? 'opacity-40' : ''}`}>
+      <span className={red ? 'text-rose-600' : 'text-slate-800'} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{card.r}</span>
+      <span className={red ? 'text-rose-600' : 'text-slate-800'}>{SUIT_SYMBOL[card.s]}</span>
+    </div>
+  );
+}
+
+const POS_COLOR = { BTN: 'text-amber-400', 'BTN/SB': 'text-amber-400', SB: 'text-sky-400', BB: 'text-violet-400', UTG: 'text-rose-400' };
+
+function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
+  if (player.eliminated) return (
+    <div className="flex flex-col items-center gap-1 opacity-30">
+      <p className="text-stone-500 text-[11px]">{player.name}</p>
+      <p className="text-stone-600 text-[10px]">已淘汰</p>
+    </div>
+  );
+  return (
+    <div className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg transition ${player.folded ? 'opacity-35' : ''} ${isActor ? 'bg-amber-400/10 ring-1 ring-amber-400/50' : ''} ${isWinner ? 'win-glow' : ''}`}>
+      <div className="flex items-center gap-1">
+        <span className="text-stone-200 text-[11px] font-medium">{player.name}</span>
+        {player.position && <span className={`text-[10px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
+        {!isHero && player.style && <span className="text-stone-500 text-[9px]">({STYLE_LABEL[player.style]})</span>}
+      </div>
+      <div className="flex gap-0.5">
+        {player.cards.map((c, i) => <CardFace key={i} card={c} hidden={!showCards} size={isHero ? 'lg' : 'sm'} animate={animate} />)}
+      </div>
+      <p className="text-amber-300/90 text-[11px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{player.stack.toLocaleString()}</p>
+      {player.committed > 0 && <p className="text-teal-300 text-[10px]">已押 {player.committed}</p>}
+      {player.allIn && <p className="text-rose-400 text-[9px] font-bold">ALL-IN</p>}
+    </div>
+  );
+}
+
+function AdvicePanel({ advice, show, onToggle }) {
+  return (
+    <div className="rounded-xl border border-teal-700/50 bg-teal-950/60 backdrop-blur-sm overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-800/40 text-teal-100 text-sm font-medium">
+        <span className="flex items-center gap-2"><Info size={15} /> 教練建議</span>
+        {show ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {show && (
+        <div className="px-4 py-3 space-y-2">
+          {!advice ? <p className="text-teal-300/70 text-sm">等候你的決策時機…</p> : (
+            <>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>{advice.action}</span>
+                {typeof advice.equity === 'number' && <span className="text-teal-200 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>勝率 ≈ {advice.equity}%</span>}
+                {advice.rangePct !== undefined && <span className="text-teal-400/70 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>前 {advice.rangePct}%</span>}
+                {advice.effBB !== undefined && advice.effBB <= 12 && <span className="text-rose-400/70 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{advice.effBB}bb 短碼</span>}
+                <span className="text-teal-500/60 text-xs">對 {advice.numOpp} 位對手 · {advice.position}</span>
+              </div>
+              <p className="text-teal-100/80 text-sm leading-relaxed">{advice.reasoning}</p>
+            </>
+          )}
+          <p className="text-teal-400/50 text-xs pt-1 border-t border-teal-800/50">近似 GTO：翻前用位置範圍（勝率百分位 + 短碼 push/fold），翻後對「對手推測範圍」算勝率 + 底池賠率／MDF。非完整 solver，供訓練參考。</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewPanel({ lines }) {
+  if (!lines || lines.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-amber-700/40 bg-amber-950/30 px-4 py-3 space-y-1.5">
+      <p className="text-amber-300 text-sm font-semibold flex items-center gap-1.5"><Heart size={15} /> 教練覆盤</p>
+      {lines.map((l, i) => <p key={i} className="text-amber-100/85 text-xs leading-relaxed">{l}</p>)}
+    </div>
+  );
+}
+
+function StatBar({ stats }) {
+  const total = stats.aligned + stats.deviated;
+  const pct = total > 0 ? Math.round((stats.aligned / total) * 100) : 0;
+  return (
+    <div className="rounded-xl border border-stone-700/50 bg-slate-900/60 px-4 py-2.5">
+      <div className="flex items-center justify-between text-xs mb-1.5">
+        <span className="text-stone-300 font-medium">紀律指標 · 已玩 {stats.hands} 手</span>
+        <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{pct}% 對齊建議</span>
+      </div>
+      <div className="h-2 rounded-full bg-stone-800 overflow-hidden flex">
+        <div className="bg-teal-500 h-full transition-all" style={{ width: `${pct}%` }} />
+        <div className="bg-rose-500/70 h-full transition-all" style={{ width: `${100 - pct}%` }} />
+      </div>
+      <div className="flex justify-between text-[10px] text-stone-500 mt-1">
+        <span>對齊 {stats.aligned}</span><span>偏離 {stats.deviated}</span>
+      </div>
+    </div>
+  );
+}
+
+function HandHistory({ history }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-stone-700/50 bg-slate-900/60">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-stone-300 text-sm font-medium">
+        <span>對局紀錄（{history.length}）</span>{open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {open && (
+        <div className="max-h-56 overflow-y-auto px-4 pb-3 space-y-2">
+          {[...history].reverse().map((h, i) => (
+            <div key={i} className="text-xs text-stone-400 border-b border-stone-800 pb-2">
+              <div className="flex justify-between"><span>第 {h.handNum} 手</span><span className="text-stone-500">底池 {h.pot}</span></div>
+              <div>你：{h.hero}{h.board && <span> · 公牌：{h.board}</span>}</div>
+              <div className="text-amber-500/80">{h.result}</div>
+            </div>
+          ))}
+          {history.length === 0 && <p className="text-stone-500 text-xs">還沒有對局紀錄</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 可調加注控制器 */
+function BetControl({ stage, pot, bb, currentBet, heroCommitted, heroStack, lastRaiseSize, onBet }) {
+  const maxTotal = heroStack + heroCommitted;
+  const minRaiseTo = Math.min(currentBet + Math.max(lastRaiseSize, bb), maxTotal);
+  const [amount, setAmount] = useState(minRaiseTo);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => { setAmount(minRaiseTo); }, [minRaiseTo, stage, pot]);
+
+  const isRaise = currentBet > 0;
+  const label = stage === 'preflop' ? '加注' : isRaise ? '加注' : '下注';
+  const type = stage === 'preflop' ? 'raise' : (isRaise ? 'raise' : 'bet');
+
+  const presets = [
+    { k: '½池', v: Math.round((pot * 0.5) / 10) * 10 },
+    { k: '¾池', v: Math.round((pot * 0.75) / 10) * 10 },
+    { k: '滿池', v: pot },
+  ].map(x => ({ ...x, total: Math.max(Math.min(currentBet + x.v, maxTotal), minRaiseTo) }));
+
+  const clamp = (v) => Math.max(minRaiseTo, Math.min(maxTotal, Math.round(v / 10) * 10));
+
+  if (maxTotal <= currentBet) return null; // 無法再加注
+
+  return (
+    <div className="col-span-2">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="w-full rounded-lg border border-amber-600 text-amber-300 py-2.5 text-sm font-medium">
+          {label}…（可調金額）
+        </button>
+      ) : (
+        <div className="rounded-lg border border-amber-600/50 bg-amber-950/20 p-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-amber-200 text-xs">{label}至</span>
+            <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
+          </div>
+          <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
+          <div className="grid grid-cols-4 gap-1.5">
+            {presets.map(p => (
+              <button key={p.k} onClick={() => setAmount(clamp(p.total))} className="rounded border border-amber-700/60 text-amber-300 text-[11px] py-1">{p.k}</button>
+            ))}
+            <button onClick={() => setAmount(maxTotal)} className="rounded border border-rose-600/70 text-rose-300 text-[11px] py-1">All-in</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
+            <button onClick={() => setOpen(false)} className="rounded-lg border border-stone-600 text-stone-300 py-2 text-sm">取消</button>
+            <button onClick={() => { onBet(type, amount); setOpen(false); }} className="rounded-lg bg-amber-600 text-slate-950 py-2 text-sm font-semibold">
+              {amount >= maxTotal ? 'All-in' : `${label} ${amount}`}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Lobby({ onStart, showAdvice }) {
+  const [mode, setMode] = useState('cash');
+  return (
+    <div className="min-h-full bg-slate-950 flex items-center justify-center px-4 py-8" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md w-full space-y-6">
+        <div className="text-center space-y-1">
+          <h1 className="text-3xl font-bold text-amber-400" style={{ fontFamily: "'Fraunces', serif" }}>Silver Line 銀線陪練桌</h1>
+          <p className="text-stone-400 text-sm">4 人桌 · 對戰 AI · 位置制 + 即時建議 + 每手覆盤</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-stone-300 text-sm font-medium">賽制模式</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setMode('cash')} className={`rounded-lg border px-4 py-3 text-sm flex flex-col items-center gap-1.5 transition ${mode === 'cash' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-stone-700 text-stone-400'}`}>
+              <Coins size={18} /> 現金桌
+              <span className="text-[11px] text-stone-500">固定盲注，破產可買入</span>
+            </button>
+            <button onClick={() => setMode('tournament')} className={`rounded-lg border px-4 py-3 text-sm flex flex-col items-center gap-1.5 transition ${mode === 'tournament' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-stone-700 text-stone-400'}`}>
+              <Trophy size={18} /> 錦標賽
+              <span className="text-[11px] text-stone-500">盲注遞增，淘汰制</span>
+            </button>
+          </div>
+        </div>
+        <div className="rounded-lg border border-stone-700 px-4 py-3 text-xs text-stone-400 space-y-1">
+          <p>對手為混合風格桌：<span className="text-stone-300">緊</span> / <span className="text-stone-300">鬆</span> / <span className="text-stone-300">跟注站</span> 各一位</p>
+          <p>4 人桌位置每輪輪動：BTN → SB → BB → UTG</p>
+        </div>
+        <button onClick={() => onStart(mode)} className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-3 transition">開始練習</button>
+        <p className="text-stone-600 text-xs text-center">起始籌碼 {STARTING_STACK.toLocaleString()} · {mode === 'tournament' ? '盲注每 8 手升一級' : '盲注固定 50/100'}</p>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const botTimer = useRef(null);
+
+  const order = state.actingOrder;
+  const actorIdx = order && order.length > 0 ? order[state.actIdxPtr % order.length] : undefined;
+
+  useEffect(() => {
+    if (!['preflop', 'flop', 'turn', 'river'].includes(state.stage)) return;
+    if (actorIdx !== 0 && actorIdx !== undefined) {
+      botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), 600);
+      return () => clearTimeout(botTimer.current);
+    }
+  }, [state.actIdxPtr, state.actingOrder, state.stage, actorIdx]);
+
+  const advice = useMemo(() => computeAdvice(state), [state.actIdxPtr, state.actingOrder, state.stage, state.board.length, state.pot, state.currentBet, state.raiseCount]);
+
+  if (state.screen === 'lobby') return <Lobby onStart={(mode) => dispatch({ type: 'START_SESSION', mode })} showAdvice={state.showAdvice} />;
+
+  const activeCount = state.players.filter(p => !p.eliminated).length;
+  const level = state.mode === 'tournament' ? Math.min(Math.floor(state.handNum / HANDS_PER_LEVEL), TOURNEY_SCHEDULE.length - 1) + 1 : null;
+  const heroActive = actorIdx === 0 && ['preflop', 'flop', 'turn', 'river'].includes(state.stage);
+  const hero = state.players[0];
+  const callAmt = heroActive ? Math.max(state.currentBet - hero.committed, 0) : 0;
+  const canCheck = callAmt === 0;
+  const showdownReveal = state.stage === 'handover';
+
+  return (
+    <div className="min-h-full bg-slate-950 px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md mx-auto space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>Silver Line 銀線陪練桌</h1>
+            <p className="text-stone-500 text-xs">
+              {state.mode === 'tournament' ? `錦標賽 · Level ${level}（${state.sb}/${state.bb}${state.ante ? `，前注 ${state.ante}` : ''}） · ${activeCount} 人桌` : `現金桌 · 盲注 ${state.sb}/${state.bb} · ${activeCount} 人桌`}
+            </p>
+          </div>
+          <button onClick={() => dispatch({ type: 'TO_LOBBY' })} className="text-stone-500 hover:text-stone-300"><X size={18} /></button>
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-b from-emerald-900 to-emerald-950 border border-emerald-800 p-3 space-y-3 shadow-xl">
+          <div className="grid grid-cols-3 gap-1">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex justify-center">
+                <Seat player={state.players[i]} isHero={false}
+                  showCards={showdownReveal && !state.players[i].folded && !state.players[i].eliminated}
+                  isActor={actorIdx === i && !showdownReveal}
+                  isWinner={showdownReveal && state.winners.includes(i)} />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5 py-1">
+            <div className="flex gap-1 min-h-[3.2rem]">
+              {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
+              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-9 h-13 rounded-md border border-dashed border-emerald-700/50" />)}
+            </div>
+            <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
+          </div>
+
+          <div className="flex justify-center pt-1 border-t border-emerald-800/50">
+            <Seat player={hero} isHero={true} showCards={true}
+              isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-slate-900/60 border border-slate-800 px-3 py-2 max-h-20 overflow-y-auto">
+          {state.feed.map((f, i) => <p key={i} className="text-stone-400 text-xs leading-relaxed">{f}</p>)}
+        </div>
+
+        <AdvicePanel advice={heroActive ? advice : null} show={state.showAdvice} onToggle={() => dispatch({ type: 'TOGGLE_ADVICE' })} />
+
+        {state.stage === 'gameover' ? (
+          <div className="rounded-xl border border-rose-800/50 bg-rose-950/40 p-4 text-center space-y-3">
+            <p className="text-rose-300 font-semibold">
+              {state.mode === 'tournament'
+                ? (state.players[0].eliminated ? `錦標賽結束，你在 4 人中拿下第 ${4 - state.finishOrder.indexOf(0)} 名` : '恭喜奪得本場冠軍！')
+                : (hero.stack <= 0 ? '你破產了' : '對局結束')}
+            </p>
+            {state.mode === 'cash' ? (
+              <button onClick={() => dispatch({ type: 'REBUY' })} className="rounded-lg bg-amber-500 text-slate-950 font-semibold px-4 py-2 text-sm">重新買入，繼續練習</button>
+            ) : (
+              <button onClick={() => dispatch({ type: 'TO_LOBBY' })} className="rounded-lg bg-amber-500 text-slate-950 font-semibold px-4 py-2 text-sm">返回大廳</button>
+            )}
+          </div>
+        ) : state.stage === 'handover' ? (
+          <div className="space-y-3">
+            <ReviewPanel lines={state.lastReview} />
+            <button onClick={() => dispatch({ type: 'NEW_HAND' })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-3 flex items-center justify-center gap-2">
+              <RefreshCw size={16} /> 下一手
+            </button>
+          </div>
+        ) : heroActive ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="rounded-lg border border-rose-700 text-rose-300 py-2.5 text-sm font-medium">棄牌</button>
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="rounded-lg border border-teal-700 text-teal-300 py-2.5 text-sm font-medium">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
+            <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
+              onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
+          </div>
+        ) : (
+          <div className="text-center text-stone-500 text-sm py-2">{state.players[actorIdx]?.name || '對手'} 思考中…</div>
+        )}
+
+        {state.stats.hands > 0 && <StatBar stats={state.stats} />}
+        <HandHistory history={state.history} />
+        <p className="text-stone-700 text-[10px] text-center pt-1">個人練習用途 · 非真錢賭博</p>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
