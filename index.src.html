@@ -756,6 +756,7 @@ const initialState = {
   finishOrder: [], gameOver: false, winners: [], showAdvice: false, trainingStyle: 'challenge',
   stats: { hands: 0, decisions: 0, evLoss: 0, buckets: {} },
 };
+const sessionMode = () => 'tournament';
 
 function makePlayers() {
   const styles = ['tight', 'loose', 'station'];
@@ -999,7 +1000,7 @@ function applyAction(state, decision) {
 function reducer(state, action) {
   switch (action.type) {
     case 'START_SESSION':
-      return startNewHand({ ...initialState, players: makePlayers(), mode: action.mode, trainingStyle: action.trainingStyle, showAdvice: action.trainingStyle === 'guided', stats: { hands: 0, decisions: 0, evLoss: 0, buckets: {} } });
+      return startNewHand({ ...initialState, players: makePlayers(), mode: sessionMode(), trainingStyle: action.trainingStyle, showAdvice: action.trainingStyle === 'guided', stats: { hands: 0, decisions: 0, evLoss: 0, buckets: {} } });
     case 'NEW_HAND':
       if (state.mode === 'cash' && state.players[0].stack <= 0) return { ...state, stage: 'gameover', gameOver: true };
       return startNewHand(state);
@@ -1248,6 +1249,26 @@ function ReviewPanel({ lines }) {
   );
 }
 
+function DecisionRetry({ decisions }) {
+  const [open, setOpen] = useState(false);
+  const [answer, setAnswer] = useState(null);
+  const mistake = [...(decisions || [])].filter(d => d.evLoss >= 0.3).sort((a, b) => b.evLoss - a.evLoss)[0];
+  if (!mistake) return null;
+  const pool = [...new Set([mistake.heroLabel, '棄牌', '跟注', '過牌', '加注', mistake.topLabel])];
+  const choices = pool.slice(-3);
+  if (!choices.includes(mistake.topLabel)) choices[0] = mistake.topLabel;
+  return (
+    <div className="training-module rounded-xl px-4 py-3">
+      {!open ? <button onClick={() => setOpen(true)} className="tap-target w-full rounded-lg border border-amber-500/50 bg-amber-950/30 text-amber-200 text-sm font-bold">立即重練這類決策</button> : <>
+        <p className="text-[10px] font-bold text-amber-300">相同概念，立刻重答</p>
+        <p className="mt-1 text-sm text-white">下次遇到「{mistake.category || mistake.streetLabel}」情境，優先選哪個行動？</p>
+        <div className="mt-2 grid grid-cols-3 gap-2">{choices.map(c => <button key={c} disabled={answer !== null} onClick={() => setAnswer(c)} className={`tap-target rounded-lg border text-xs font-bold ${answer === null ? 'border-stone-700 text-stone-200' : c === mistake.topLabel ? 'border-teal-500 bg-teal-950 text-teal-200' : answer === c ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-stone-800 text-stone-600'}`}>{c}</button>)}</div>
+        {answer && <div className="mt-2 text-xs leading-relaxed"><b className={answer === mistake.topLabel ? 'text-teal-300' : 'text-rose-300'}>{answer === mistake.topLabel ? '答對，已抓到核心。' : `這類情境優先考慮「${mistake.topLabel}」。`}</b><p className="mt-1 text-stone-400">{mistake.reasoning}</p></div>}
+      </>}
+    </div>
+  );
+}
+
 function StatBar({ stats }) {
   const avg = stats.hands > 0 ? stats.evLoss / stats.hands : 0;
   // 契合度：平均每手 0bb → 100 分；≥3bb → 0 分
@@ -1287,6 +1308,7 @@ function FiveHandSummary({ history }) {
   });
   const ranked = Object.entries(groups).sort((a, b) => b[1].mistakes - a[1].mistakes || b[1].loss - a[1].loss);
   const weak = ranked[0];
+  const strong = [...ranked].sort((a, b) => a[1].mistakes - b[1].mistakes || a[1].loss - b[1].loss)[0];
   const scored = hands.map(h => ({ ...h, loss: (h.decisions || []).reduce((s, d) => s + d.evLoss, 0) })).filter(h => (h.decisions || []).length);
   const best = [...scored].sort((a, b) => a.loss - b.loss)[0];
   const biggest = [...scored].sort((a, b) => b.loss - a.loss)[0];
@@ -1305,9 +1327,9 @@ function FiveHandSummary({ history }) {
       </div>
       <div className="px-4 py-3">
         <p className="text-xs text-stone-300"><b className="text-amber-300">下一步：</b>{next}</p>
-        <p className="mt-3 text-[11px] text-stone-500">到 SILVER LINE 實戰。</p>
+        <p className="mt-3 text-[11px] text-teal-200">{strong ? `你在「${strong[0]}」的判斷最穩定。` : '你已完成第一輪診斷。'}準備好再到 SILVER LINE 實戰。</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <a href="https://silverline-poker.netlify.app" target="_blank" rel="noreferrer" className="vivid-primary tap-target rounded-lg flex items-center justify-center text-xs font-bold">查看俱樂部</a>
+          <a href="https://silverline-poker.netlify.app/?utm_source=practice_table&utm_medium=trainer&utm_campaign=five_hand" target="_blank" rel="noreferrer" className="vivid-primary tap-target rounded-lg flex items-center justify-center text-xs font-bold">查看俱樂部</a>
           <button onClick={copyId} className="tap-target rounded-lg border border-teal-500/50 bg-teal-950/50 text-teal-200 text-xs font-bold flex items-center justify-center gap-1.5">⧉ {copied ? '已複製' : '複製 ID 450920'}</button>
         </div>
         <a href="https://t.me/silverlinepokerclub" target="_blank" rel="noreferrer" className="mt-2 tap-target w-full rounded-lg border border-stone-700 text-stone-300 text-xs font-semibold flex items-center justify-center">查看 Telegram 公告</a>
@@ -1827,6 +1849,8 @@ function App() {
         ) : state.stage === 'handover' ? (
           <div className="space-y-3">
             <ReviewPanel lines={state.lastReview} />
+            <DecisionRetry key={state.handNum} decisions={state.history[state.history.length - 1]?.decisions} />
+            {state.stats.hands < 5 && <div className="training-module rounded-xl px-4 py-3 text-center"><b className="text-teal-300 text-sm">再 {5 - state.stats.hands} 手</b><span className="text-stone-400 text-xs">，解鎖你的五手個人診斷</span></div>}
             <FiveHandSummary history={state.history} />
             <button onClick={() => dispatch({ type: 'NEW_HAND' })} className="next-hand w-full rounded-lg font-semibold py-3 flex items-center justify-center gap-2">
               <RefreshCw size={16} /> 下一手
@@ -1845,7 +1869,9 @@ function App() {
   );
 }
 
+console.assert(sessionMode(new URLSearchParams('?mode=cash')) === 'tournament', 'Cash mode must stay unreachable');
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+setTimeout(() => console.assert(![...document.querySelectorAll('button')].some(b => b.textContent.trim() === '現金桌'), 'Cash mode entry must not render'));
   </script>
 </body>
 </html>
