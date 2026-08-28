@@ -69,12 +69,13 @@
     .training-table::after { z-index:0; top:61%; color:rgba(255,255,255,.12) }
     .table-seat { position:absolute !important; z-index:2; width:112px; display:flex; justify-content:center }
     .table-seat-top { left:50%; top:10px; transform:translateX(-50%) }
-    .table-seat-left { left:-8px; top:40%; transform:translateY(-50%) }
-    .table-seat-right { right:-8px; top:40%; transform:translateY(-50%) }
+    .table-seat-left { left:-8px; top:50%; transform:translateY(-50%) }
+    .table-seat-right { right:-8px; top:50%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
     .table-center { position:absolute !important; z-index:1; left:50%; top:51%; width:100%; transform:translate(-50%,-50%) }
-    .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid rgba(34,45,60,.6); background:linear-gradient(145deg,#fffdf5 0,#ece8dc 100%); box-shadow:0 5px 12px rgba(0,0,0,.32),inset 0 0 0 1px rgba(255,255,255,.8) }
-    .playing-card::after { content:attr(data-suit); position:absolute; right:-2px; bottom:-8px; color:currentColor; font:700 34px Georgia,serif; opacity:.08 }
+    .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid #667085; background:radial-gradient(circle at 30% 18%,#293242 0,#121823 42%,#06090f 100%); box-shadow:0 7px 16px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.08) }
+    .playing-card::before { content:""; position:absolute; inset:4px; border:1px solid currentColor; border-radius:4px; opacity:.2 }
+    .playing-card::after { content:attr(data-suit); position:absolute; right:-3px; bottom:-10px; color:currentColor; font:700 42px Georgia,serif; opacity:.12 }
     .card-back { position:relative; overflow:hidden; flex:none; border:2px solid #7696d4; background:repeating-linear-gradient(45deg,#203d78 0 6px,#294b8c 6px 12px); box-shadow:0 5px 12px rgba(0,0,0,.4),inset 0 0 0 3px #142955,inset 0 0 0 5px rgba(174,201,255,.34) }
     .card-back::before { content:"SIL"; position:absolute; inset:7px 5px; display:grid; place-items:center; border:1px solid rgba(219,230,255,.55); color:#dce7ff; font:700 8px 'Fraunces',serif; letter-spacing:.12em; text-shadow:0 1px 2px #07152f }
     .player-avatar { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 2px solid #718096; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#34465c,#101827); box-shadow: inset 0 1px 5px rgba(255,255,255,.14),0 6px 15px rgba(0,0,0,.4); font: 700 16px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
@@ -1020,16 +1021,16 @@ function reducer(state, action) {
    UI 元件
    ============================================================ */
 function CardFace({ card, hidden, size = 'md', dim, animate }) {
-  const dims = size === 'lg' ? 'w-14 h-20 text-xl' : size === 'sm' ? 'w-9 h-[3.2rem] text-xs' : 'w-11 h-[3.9rem] text-base';
+  const dims = size === 'lg' ? 'w-16 h-[5.5rem] text-2xl' : size === 'sm' ? 'w-11 h-[3.9rem] text-base' : 'w-12 h-[4.25rem] text-lg';
   const anim = animate ? 'deal-in' : '';
   if (hidden) {
     return <div className={`${dims} ${anim} card-back rounded-md ${dim ? 'opacity-40' : ''}`} aria-label="牌背" />;
   }
   const red = SUIT_RED[card.s];
   return (
-    <div data-suit={SUIT_SYMBOL[card.s]} className={`${dims} ${anim} playing-card rounded-md flex flex-col items-start justify-start p-1 font-semibold leading-none ${red ? 'text-rose-600' : 'text-slate-800'} ${dim ? 'opacity-40' : ''}`}>
+    <div data-suit={SUIT_SYMBOL[card.s]} className={`${dims} ${anim} playing-card rounded-md flex flex-col items-center justify-center font-bold leading-none ${red ? 'text-[#ff5b6e]' : 'text-[#eef4ff]'} ${dim ? 'opacity-40' : ''}`}>
       <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{card.r}</span>
-      <span className="mt-0.5">{SUIT_SYMBOL[card.s]}</span>
+      <span className="mt-1 text-[.9em]">{SUIT_SYMBOL[card.s]}</span>
     </div>
   );
 }
@@ -1763,7 +1764,7 @@ function App() {
           <div className="table-center flex flex-col items-center gap-2">
             <div className="flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
-              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-11 h-[3.9rem] rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
+              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-12 h-[4.25rem] rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
             </div>
             <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
