@@ -65,6 +65,14 @@
     .training-bar { border: 1px solid #253448; background: rgba(10,18,31,.92); box-shadow: 0 12px 32px rgba(0,0,0,.28); backdrop-filter: blur(14px); }
     .training-felt { border: 7px solid #b9a98d !important; border-radius: 46% / 20% !important; background: radial-gradient(ellipse at center, #08719a 0, #07567d 52%, #073d60 100%) !important; box-shadow: inset 0 0 0 2px rgba(255,255,255,.3), inset 0 0 46px rgba(0,22,42,.48), 0 0 0 3px #526071, 0 22px 45px rgba(0,0,0,.52) !important; }
     .training-felt::after { content: "SILVER LINE  •  TRAINING TABLE"; position: absolute; left: 50%; top: 49%; transform: translate(-50%,-50%); color: rgba(255,255,255,.15); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .12em; white-space: nowrap; }
+    .training-table { height:min(62vh,540px); min-height:470px; border-color:#343c48 !important; border-radius:44% / 15% !important; background:radial-gradient(ellipse at 50% 45%,#123f51 0,#0a2c3d 52%,#071b2a 100%) !important; box-shadow:inset 0 0 0 2px rgba(218,190,135,.36),inset 0 0 58px rgba(0,10,22,.68),0 0 0 3px #111722,0 22px 45px rgba(0,0,0,.58) !important }
+    .training-table::after { z-index:0; top:61%; color:rgba(255,255,255,.12) }
+    .table-seat { position:absolute !important; z-index:2; width:112px; display:flex; justify-content:center }
+    .table-seat-top { left:50%; top:10px; transform:translateX(-50%) }
+    .table-seat-left { left:-8px; top:30%; transform:translateY(-50%) }
+    .table-seat-right { right:-8px; top:30%; transform:translateY(-50%) }
+    .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
+    .table-center { position:absolute !important; z-index:1; left:50%; top:51%; width:100%; transform:translate(-50%,-50%) }
     .player-avatar { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 2px solid #718096; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#34465c,#101827); box-shadow: inset 0 1px 5px rgba(255,255,255,.14),0 6px 15px rgba(0,0,0,.4); font: 700 16px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
     .player-avatar::after { content: ""; position: absolute; width: 16px; height: 7px; bottom: 8px; border-bottom: 2px solid currentColor; border-radius: 50%; opacity: .75; }
     .avatar-1 { color:#62e6db; background:linear-gradient(145deg,#176b72,#102638) }.avatar-2 { color:#ffd86b; background:linear-gradient(145deg,#725322,#211b22) }.avatar-3 { color:#91b8ff; background:linear-gradient(145deg,#315d9d,#141d38) }.avatar-0 { color:#ff8a78; background:linear-gradient(145deg,#923f45,#2b1722); border-color:#ff8a78 }
@@ -1743,16 +1751,13 @@ function App() {
           <button onClick={() => dispatch({ type: 'TO_LOBBY' })} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
 
-        <div className="felt training-felt px-3 py-4">
-          {/* 圍成一圈：上=對手B、左=對手A、右=對手C、下=你，公牌在正中央 */}
-          <div className="flex justify-center min-h-[4.4rem] items-start">{oppSeat(2)}</div>
+        <div className="felt training-felt training-table px-3 py-4">
+          {/* 四人直立桌：座位沿桌緣配置，中央只保留公共牌與底池。 */}
+          <div className="table-seat table-seat-top">{oppSeat(2)}</div>
+          <div className="table-seat table-seat-left">{oppSeat(1)}</div>
+          <div className="table-seat table-seat-right">{oppSeat(3)}</div>
 
-          <div className="flex justify-between items-start gap-2 px-1">
-            <div className="flex justify-start">{oppSeat(1)}</div>
-            <div className="flex justify-end">{oppSeat(3)}</div>
-          </div>
-
-          <div className="flex flex-col items-center gap-1.5 py-3">
+          <div className="table-center flex flex-col items-center gap-2">
             <div className="flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
               {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-9 h-13 rounded-md border border-dashed border-emerald-700/50" />)}
@@ -1760,7 +1765,7 @@ function App() {
             <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
 
-          <div className="flex justify-center min-h-[5.4rem] items-end pt-1 border-t border-white/10">
+          <div className="table-seat table-seat-hero">
             <Seat player={hero} isHero={true} showCards={true}
               isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} />
           </div>
