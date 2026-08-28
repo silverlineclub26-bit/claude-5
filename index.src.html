@@ -23,7 +23,7 @@
     @keyframes dealIn { from { opacity: 0; transform: translateY(-8px) scale(.9); } to { opacity: 1; transform: none; } }
     @keyframes potPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
     @keyframes winGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); } 50% { box-shadow: 0 0 16px 3px rgba(251,191,36,.55); } }
-    .deal-in { animation: dealIn .28s ease-out both; }
+    .deal-in { animation: dealIn .45s cubic-bezier(.2,.8,.2,1) both; }
     .pot-pulse { animation: potPulse .5s ease-out; }
     .win-glow { animation: winGlow 1.4s ease-in-out infinite; border-radius: .5rem; }
     .tap-target { min-height: 48px; touch-action: manipulation; }
@@ -69,10 +69,14 @@
     .training-table::after { z-index:0; top:61%; color:rgba(255,255,255,.12) }
     .table-seat { position:absolute !important; z-index:2; width:112px; display:flex; justify-content:center }
     .table-seat-top { left:50%; top:10px; transform:translateX(-50%) }
-    .table-seat-left { left:-8px; top:30%; transform:translateY(-50%) }
-    .table-seat-right { right:-8px; top:30%; transform:translateY(-50%) }
+    .table-seat-left { left:-8px; top:40%; transform:translateY(-50%) }
+    .table-seat-right { right:-8px; top:40%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
     .table-center { position:absolute !important; z-index:1; left:50%; top:51%; width:100%; transform:translate(-50%,-50%) }
+    .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid rgba(34,45,60,.6); background:linear-gradient(145deg,#fffdf5 0,#ece8dc 100%); box-shadow:0 5px 12px rgba(0,0,0,.32),inset 0 0 0 1px rgba(255,255,255,.8) }
+    .playing-card::after { content:attr(data-suit); position:absolute; right:-2px; bottom:-8px; color:currentColor; font:700 34px Georgia,serif; opacity:.08 }
+    .card-back { position:relative; overflow:hidden; flex:none; border:2px solid #7696d4; background:repeating-linear-gradient(45deg,#203d78 0 6px,#294b8c 6px 12px); box-shadow:0 5px 12px rgba(0,0,0,.4),inset 0 0 0 3px #142955,inset 0 0 0 5px rgba(174,201,255,.34) }
+    .card-back::before { content:"SIL"; position:absolute; inset:7px 5px; display:grid; place-items:center; border:1px solid rgba(219,230,255,.55); color:#dce7ff; font:700 8px 'Fraunces',serif; letter-spacing:.12em; text-shadow:0 1px 2px #07152f }
     .player-avatar { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 2px solid #718096; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#34465c,#101827); box-shadow: inset 0 1px 5px rgba(255,255,255,.14),0 6px 15px rgba(0,0,0,.4); font: 700 16px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
     .player-avatar::after { content: ""; position: absolute; width: 16px; height: 7px; bottom: 8px; border-bottom: 2px solid currentColor; border-radius: 50%; opacity: .75; }
     .avatar-1 { color:#62e6db; background:linear-gradient(145deg,#176b72,#102638) }.avatar-2 { color:#ffd86b; background:linear-gradient(145deg,#725322,#211b22) }.avatar-3 { color:#91b8ff; background:linear-gradient(145deg,#315d9d,#141d38) }.avatar-0 { color:#ff8a78; background:linear-gradient(145deg,#923f45,#2b1722); border-color:#ff8a78 }
@@ -1016,18 +1020,16 @@ function reducer(state, action) {
    UI 元件
    ============================================================ */
 function CardFace({ card, hidden, size = 'md', dim, animate }) {
-  const dims = size === 'lg' ? 'w-12 h-[4.3rem] text-lg' : size === 'sm' ? 'w-7 h-10 text-[10px]' : 'w-9 h-13 text-sm';
+  const dims = size === 'lg' ? 'w-14 h-20 text-xl' : size === 'sm' ? 'w-9 h-[3.2rem] text-xs' : 'w-11 h-[3.9rem] text-base';
   const anim = animate ? 'deal-in' : '';
   if (hidden) {
-    return <div className={`${dims} ${anim} rounded-md bg-gradient-to-br from-zinc-700 to-zinc-950 border border-zinc-500/40 flex items-center justify-center shadow-md ${dim ? 'opacity-40' : ''}`}>
-      <span className="text-zinc-300/80 font-bold text-[8px] tracking-widest" style={{ fontFamily: "'Fraunces', serif" }}>SIL</span>
-    </div>;
+    return <div className={`${dims} ${anim} card-back rounded-md ${dim ? 'opacity-40' : ''}`} aria-label="牌背" />;
   }
   const red = SUIT_RED[card.s];
   return (
-    <div className={`${dims} ${anim} rounded-md bg-stone-50 border border-stone-300 flex flex-col items-center justify-center shadow-md font-semibold leading-none ${dim ? 'opacity-40' : ''}`}>
-      <span className={red ? 'text-rose-600' : 'text-slate-800'} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{card.r}</span>
-      <span className={red ? 'text-rose-600' : 'text-slate-800'}>{SUIT_SYMBOL[card.s]}</span>
+    <div data-suit={SUIT_SYMBOL[card.s]} className={`${dims} ${anim} playing-card rounded-md flex flex-col items-start justify-start p-1 font-semibold leading-none ${red ? 'text-rose-600' : 'text-slate-800'} ${dim ? 'opacity-40' : ''}`}>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{card.r}</span>
+      <span className="mt-0.5">{SUIT_SYMBOL[card.s]}</span>
     </div>
   );
 }
@@ -1713,7 +1715,8 @@ function App() {
     if (actorIdx !== 0 && actorIdx !== undefined) {
       // 你已棄牌/出局→這手對你已結束，快轉剩下的機器人流程，直接跳到教練覆盤＋下一手
       const heroOut = state.players[0] && (state.players[0].folded || state.players[0].eliminated);
-      botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), heroOut ? 45 : 600);
+      const delay = heroOut ? 550 + Math.random() * 300 : 900 + Math.random() * 600;
+      botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), delay);
       return () => clearTimeout(botTimer.current);
     }
   }, [state.actIdxPtr, state.actingOrder, state.stage, actorIdx]);
@@ -1735,7 +1738,7 @@ function App() {
     <Seat player={state.players[i]} isHero={false}
       showCards={showdownReveal && !state.players[i].folded && !state.players[i].eliminated}
       isActor={actorIdx === i && !showdownReveal}
-      isWinner={showdownReveal && state.winners.includes(i)} />
+      isWinner={showdownReveal && state.winners.includes(i)} animate={state.stage === 'preflop'} />
   );
 
   return (
@@ -1760,14 +1763,14 @@ function App() {
           <div className="table-center flex flex-col items-center gap-2">
             <div className="flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
-              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-9 h-13 rounded-md border border-dashed border-emerald-700/50" />)}
+              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-11 h-[3.9rem] rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
             </div>
             <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
 
           <div className="table-seat table-seat-hero">
             <Seat player={hero} isHero={true} showCards={true}
-              isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} />
+              isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} animate={state.stage === 'preflop'} />
           </div>
         </div>
 
