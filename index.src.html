@@ -47,7 +47,9 @@
     .preview-card.back { border-color: #50545d; background: #1b1e25; color: #d1a947; font-family: Georgia, serif; }
     .preview-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(232,198,106,.4); border-radius: 999px; background: rgba(5,17,14,.75); padding: 4px 9px; color: #f2cf6d; font: 600 10px 'JetBrains Mono', monospace; box-shadow: 0 7px 18px rgba(0,0,0,.28); }
     .preview-chip::before { content: ""; width: 10px; height: 10px; border: 2px dotted #f2cf6d; border-radius: 50%; }
-    .lobby-shell { min-height: 100%; color: #17191d; background-color: #edf1ee; background-image: repeating-linear-gradient(90deg, transparent 0 31px, rgba(20,24,29,.035) 31px 32px); }
+    .lobby-shell { min-height:100%; overflow-x:hidden; color:#17191d; background-color:#edf1ee; background-image:repeating-linear-gradient(90deg,transparent 0 31px,rgba(20,24,29,.035) 31px 32px) }
+    .lobby-shell .max-w-md { max-width:100% }
+    .lobby-shell button { min-width:0 }
     .vivid-header { position: relative; overflow: hidden; min-height: 138px; border: 2px solid #17191d; border-radius: 8px; background: #ef5a46; box-shadow: 7px 7px 0 #17191d; }
     .vivid-header::after { content: "♠"; position: absolute; right: -8px; bottom: -54px; color: rgba(255,255,255,.2); font: 700 150px Georgia, serif; transform: rotate(10deg); }
     .vivid-kicker { display: inline-flex; align-items: center; min-height: 24px; border: 1px solid #17191d; border-radius: 999px; background: #f8d748; padding: 0 9px; color: #17191d; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -91,6 +93,10 @@
     .training-shell .action-dock { border:1px solid #34475e; background:rgba(7,14,26,.96); box-shadow:0 14px 38px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.05) }
     .training-shell .bright-panel,.training-module { border:1px solid #29394e !important; background:linear-gradient(145deg,rgba(15,27,45,.96),rgba(7,14,25,.96)) !important; color:#eef3fa; box-shadow:0 10px 26px rgba(0,0,0,.22) }
     .next-hand { min-height:54px; border:1px solid #f17b70; background:linear-gradient(135deg,#f06458,#d34240); color:white; box-shadow:0 10px 24px rgba(211,66,64,.25),inset 0 1px rgba(255,255,255,.18) }
+    .decision-console { overflow:hidden; border:1px solid #34475e; border-radius:8px; background:rgba(7,14,26,.97); box-shadow:0 16px 38px rgba(0,0,0,.48) }
+    .decision-console .bright-panel,.decision-console .action-dock { border:0 !important; border-radius:0 !important; box-shadow:none !important; background:transparent !important }
+    .decision-console .action-dock { border-top:1px solid #27394e !important; position:static }
+    .decision-note { border-top:1px solid #27394e; background:rgba(239,98,88,.035) }
     .lobby-shell .lobby-table { border-color: #17191d; box-shadow: inset 0 0 0 6px #174c40, inset 0 0 0 8px #75c6ae, 7px 8px 0 #17191d; animation: tableRise .5s ease-out both; }
     .lobby-shell .seat-dot { border: 2px solid #17191d; background: #f8d748; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
     .lobby-shell .seat-dot:nth-of-type(2) { background: #64d8ce; }
@@ -1039,7 +1045,7 @@ function CardFace({ card, hidden, size = 'md', dim, animate }) {
 
 const POS_COLOR = { BTN: 'text-amber-400', 'BTN/SB': 'text-amber-400', SB: 'text-sky-400', BB: 'text-violet-400', UTG: 'text-rose-400' };
 
-function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
+function Seat({ player, isHero, showCards, isActor, isWinner, animate, compactCards }) {
   if (player.eliminated) return (
     <div className="flex flex-col items-center gap-1 opacity-30">
       <p className="text-stone-500 text-[13px]">{player.name}</p>
@@ -1054,7 +1060,7 @@ function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
         {player.position && <span className={`text-[12px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
       </div>
       {!isHero && player.style && <span className="rounded-full bg-black/35 px-1.5 py-0.5 text-[9px] font-medium text-stone-300">{STYLE_LABEL[player.style]}</span>}
-      <div className="flex gap-0.5">
+      <div className={`flex ${compactCards ? '-space-x-3' : 'gap-0.5'}`}>
         {player.cards.map((c, i) => <CardFace key={i} card={c} hidden={!showCards} size={isHero ? 'lg' : 'sm'} animate={animate} />)}
       </div>
       <p className="text-amber-300/90 text-[13px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{player.stack.toLocaleString()}</p>
@@ -1635,22 +1641,6 @@ function Lobby({ onStart, onDrill, onICM, showAdvice }) {
           <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-[9px] font-bold text-[#17191d]"><span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> ENGINE ON</div>
         </header>
 
-        <div className="lobby-table -mt-7" aria-label="四人撲克訓練桌預覽">
-          <span className="seat-dot left-1/2 top-4 -translate-x-1/2">AI</span>
-          <span className="seat-dot left-4 top-1/2 -translate-y-1/2">AI</span>
-          <span className="seat-dot right-4 top-1/2 -translate-y-1/2">AI</span>
-          <div className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2">
-            <div className="flex items-center justify-center gap-1">
-              <PreviewCard rank="K" suit="♦" tilt={-2} /><PreviewCard rank="7" suit="♣" /><PreviewCard rank="2" suit="♥" tilt={2} />
-            </div>
-            <div className="mt-2 text-center"><span className="preview-chip">POT 650</span></div>
-          </div>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
-            <div className="flex justify-center -space-x-1"><PreviewCard rank="A" suit="♠" tilt={-4} /><PreviewCard rank="K" suit="♠" tilt={4} /></div>
-            <span className="mt-1 inline-block rounded-full bg-black/55 px-2 py-0.5 text-[9px] font-semibold text-amber-200">YOU · BTN</span>
-          </div>
-        </div>
-
         <section className="space-y-2.5">
           <div className="flex items-center justify-between px-1"><p className="text-xs font-bold text-[#17191d]">開始一局</p><span className="text-[10px] font-medium text-[#656b69]">4 人桌 · AI 對手</span></div>
           <div className="vivid-control space-y-2.5 p-3">
@@ -1741,7 +1731,7 @@ function App() {
     <Seat player={state.players[i]} isHero={false}
       showCards={showdownReveal && !state.players[i].folded && !state.players[i].eliminated}
       isActor={actorIdx === i && !showdownReveal}
-      isWinner={showdownReveal && state.winners.includes(i)} animate={state.stage === 'preflop'} />
+      isWinner={showdownReveal && state.winners.includes(i)} animate={state.stage === 'preflop'} compactCards={i === 1 || i === 3} />
   );
 
   return (
@@ -1775,23 +1765,23 @@ function App() {
           </div>
         </div>
 
-        <ActionFeed feed={state.feed} />
-
-        {heroActive && (
-          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg p-2">
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="vivid-action vivid-fold tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">棄牌</button>
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="vivid-action vivid-call tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
-            <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
-              onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
+        {heroActive ? (
+          <div className="decision-console sticky bottom-2 z-20">
+            <ActionFeed feed={state.feed} />
+            <div className="action-dock flex flex-wrap gap-2 p-2">
+              <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="vivid-action vivid-fold tap-target flex-1 min-w-[4rem] text-sm whitespace-nowrap px-2">棄牌</button>
+              <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="vivid-action vivid-call tap-target flex-1 min-w-[4rem] text-sm whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
+              <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
+                onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
+            </div>
+            {state.trainingStyle === 'challenge' && <div className="decision-note px-3 py-2 text-[11px] text-slate-400 flex items-center gap-2">
+              <Heart size={13} className="text-[#ef6258]" /><span><b className="text-slate-200">先作答</b> · 短評將揭曉建議與 EV</span>
+            </div>}
           </div>
-        )}
+        ) : <ActionFeed feed={state.feed} />}
 
         {state.trainingStyle === 'guided' ? (
           <AdvicePanel advice={heroActive ? advice : null} show={state.showAdvice} onToggle={() => dispatch({ type: 'TOGGLE_ADVICE' })} />
-        ) : heroActive ? (
-          <div className="training-module rounded-lg px-3 py-2.5 text-xs text-stone-400 flex items-center gap-2">
-            <Heart size={14} className="text-amber-300" /><span><b className="text-stone-200">先作答模式</b> · 建議與 EV 會在本手覆盤揭曉</span>
-          </div>
         ) : null}
 
         {heroActive && state.stage === 'preflop' && advice && advice.strategy && advice.strategy.evIsProxy && (
