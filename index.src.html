@@ -69,12 +69,11 @@
     .training-table::after { z-index:0; top:61%; color:rgba(255,255,255,.12) }
     .table-seat { position:absolute !important; z-index:2; width:112px; display:flex; justify-content:center }
     .table-seat-top { left:50%; top:10px; transform:translateX(-50%) }
-    .table-seat-left { left:-8px; top:43%; transform:translateY(-50%) }
-    .table-seat-right { right:-8px; top:43%; transform:translateY(-50%) }
+    .table-seat-left { left:-14px; top:43%; transform:translateY(-50%) }
+    .table-seat-right { right:-14px; top:43%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
-    .table-center { position:absolute !important; z-index:1; inset:0; pointer-events:none }
-    .community-cards { position:absolute !important; left:50%; top:50%; transform:translate(-50%,-50%) }
-    .table-pot { position:absolute !important; left:50%; top:calc(50% + 44px); transform:translateX(-50%); white-space:nowrap }
+    .community-cards { position:absolute !important; z-index:3; left:50%; top:50%; transform:translate(-50%,-50%); gap:3px; padding:6px; border:1px solid rgba(116,183,211,.22); border-radius:8px; background:rgba(3,13,23,.28); box-shadow:inset 0 0 18px rgba(0,0,0,.2) }
+    .table-pot { position:absolute !important; z-index:3; left:50%; top:calc(50% + 44px); transform:translateX(-50%); white-space:nowrap }
     .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid #667085; background:radial-gradient(circle at 30% 18%,#293242 0,#121823 42%,#06090f 100%); box-shadow:0 7px 16px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.08) }
     .playing-card::before { content:""; position:absolute; inset:4px; border:1px solid currentColor; border-radius:4px; opacity:.2 }
     .playing-card::after { content:attr(data-suit); position:absolute; right:-3px; bottom:-10px; color:currentColor; font:700 42px Georgia,serif; opacity:.12 }
@@ -1024,7 +1023,7 @@ function reducer(state, action) {
    UI 元件
    ============================================================ */
 function CardFace({ card, hidden, size = 'md', dim, animate }) {
-  const dims = size === 'lg' ? 'w-16 h-[5.5rem] text-2xl' : size === 'sm' ? 'w-11 h-[3.9rem] text-base' : 'w-12 h-[4.25rem] text-lg';
+  const dims = size === 'lg' ? 'w-16 h-[5.5rem] text-2xl' : size === 'sm' ? 'w-11 h-[3.9rem] text-base' : 'w-11 h-16 text-lg';
   const anim = animate ? 'deal-in' : '';
   if (hidden) {
     return <div className={`${dims} ${anim} card-back rounded-md ${dim ? 'opacity-40' : ''}`} aria-label="牌背" />;
@@ -1763,13 +1762,11 @@ function App() {
           <div className="table-seat table-seat-left">{oppSeat(1)}</div>
           <div className="table-seat table-seat-right">{oppSeat(3)}</div>
 
-          <div className="table-center">
-            <div className="community-cards flex gap-1 min-h-[3.2rem]">
-              {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
-              {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-12 h-[4.25rem] rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
-            </div>
-            <div key={state.pot} className="table-pot flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
+          <div className="community-cards flex min-h-[3.2rem]">
+            {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
+            {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-11 h-16 rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
           </div>
+          <div key={state.pot} className="table-pot flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
 
           <div className="table-seat table-seat-hero">
             <Seat player={hero} isHero={true} showCards={true}
