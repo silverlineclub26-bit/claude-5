@@ -40,13 +40,6 @@
     .close-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #292c33; border-radius: 8px; background: #111318; }
     .action-dock { padding-bottom: max(.375rem, env(safe-area-inset-bottom)); backdrop-filter: blur(14px); }
     .lobby-title { font-family: 'Noto Serif TC', serif; text-shadow: 0 8px 28px rgba(0,0,0,.45); }
-    .lobby-table { position: relative; height: 230px; overflow: hidden; border: 1px solid #8a6b32; border-radius: 48% / 24%; background: #06483b; box-shadow: inset 0 0 0 6px #161513, inset 0 0 0 8px #b18a3f, inset 0 0 42px rgba(0,0,0,.5), 0 26px 55px rgba(0,0,0,.5); }
-    .lobby-table::before { content: ""; position: absolute; inset: 10px; border-radius: inherit; border: 1px solid rgba(232,198,106,.22); background-image: repeating-linear-gradient(30deg, transparent 0 7px, rgba(255,255,255,.018) 7px 8px); }
-    .seat-dot { position: absolute; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #3d4048; border-radius: 50%; background: #15171c; color: #8f9299; box-shadow: 0 7px 16px rgba(0,0,0,.4); font: 600 10px 'Inter', sans-serif; }
-    .preview-card { width: 34px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #d6d3d1; border-radius: 5px; background: #fafaf9; box-shadow: 0 6px 14px rgba(0,0,0,.35); font: 700 12px 'JetBrains Mono', monospace; line-height: 1; }
-    .preview-card.back { border-color: #50545d; background: #1b1e25; color: #d1a947; font-family: Georgia, serif; }
-    .preview-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(232,198,106,.4); border-radius: 999px; background: rgba(5,17,14,.75); padding: 4px 9px; color: #f2cf6d; font: 600 10px 'JetBrains Mono', monospace; box-shadow: 0 7px 18px rgba(0,0,0,.28); }
-    .preview-chip::before { content: ""; width: 10px; height: 10px; border: 2px dotted #f2cf6d; border-radius: 50%; }
     .lobby-shell { min-height:100%; overflow-x:hidden; color:#17191d; background-color:#edf1ee; background-image:repeating-linear-gradient(90deg,transparent 0 31px,rgba(20,24,29,.035) 31px 32px) }
     .lobby-shell .max-w-md { max-width:100% }
     .lobby-shell button { min-width:0 }
@@ -76,8 +69,11 @@
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
     .community-cards { position:absolute !important; z-index:3; left:50%; top:50%; transform:translate(-50%,-50%); gap:3px; padding:6px; border:1px solid rgba(116,183,211,.22); border-radius:8px; background:rgba(3,13,23,.28); box-shadow:inset 0 0 18px rgba(0,0,0,.2) }
     .table-pot { position:absolute !important; z-index:4; left:50%; transform:translate(-50%,-50%); min-height:28px; padding:4px 10px; border:1px solid rgba(245,199,76,.38); border-radius:999px; background:rgba(4,12,22,.92); color:#f4c84d; box-shadow:0 6px 16px rgba(0,0,0,.3); white-space:nowrap }
-    .table-pot-center { top:50% }
+    .table-pot-center { top:42% }
     .table-pot-below { top:calc(50% + 48px) }
+    .community-waiting { position:absolute !important; z-index:3; left:50%; top:52%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:6px }
+    .community-slots { display:flex; gap:3px; padding:5px; border:1px solid rgba(116,183,211,.18); border-radius:8px; background:rgba(3,13,23,.2) }
+    .community-slot { width:30px; height:46px; border:1px dashed rgba(116,183,211,.28); border-radius:5px; background:rgba(3,13,23,.14) }
     .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid #667085; background:radial-gradient(circle at 30% 18%,#293242 0,#121823 42%,#06090f 100%); box-shadow:0 7px 16px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.08) }
     .playing-card::before { content:""; position:absolute; inset:4px; border:1px solid currentColor; border-radius:4px; opacity:.2 }
     .playing-card::after { content:attr(data-suit); position:absolute; right:-3px; bottom:-10px; color:currentColor; font:700 42px Georgia,serif; opacity:.12 }
@@ -99,15 +95,6 @@
     .decision-console .bright-panel,.decision-console .action-dock { border:0 !important; border-radius:0 !important; box-shadow:none !important; background:transparent !important }
     .decision-console .action-dock { border-top:1px solid #27394e !important; position:static }
     .decision-note { border-top:1px solid #27394e; background:rgba(239,98,88,.035) }
-    .lobby-shell .lobby-table { border-color: #17191d; box-shadow: inset 0 0 0 6px #174c40, inset 0 0 0 8px #75c6ae, 7px 8px 0 #17191d; animation: tableRise .5s ease-out both; }
-    .lobby-shell .seat-dot { border: 2px solid #17191d; background: #f8d748; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
-    .lobby-shell .seat-dot:nth-of-type(2) { background: #64d8ce; }
-    .lobby-shell .seat-dot:nth-of-type(3) { background: #8fb8ff; }
-    .lobby-shell .preview-card { animation: cardFan .42s ease-out both; }
-    .lobby-shell .preview-chip { animation: chipBeat 2.2s ease-in-out infinite; }
-    @keyframes tableRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-    @keyframes cardFan { from { opacity: 0; transform: translateY(-10px) rotate(0); } to { opacity: 1; } }
-    @keyframes chipBeat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
     .rounded-xl, .rounded-2xl { border-radius: .5rem !important; }
     @media (prefers-reduced-motion: reduce) {
       .deal-in, .pot-pulse, .win-glow, .lobby-table, .preview-card, .preview-chip { animation: none !important; }
@@ -117,7 +104,7 @@
       .table-seat-left,.table-seat-right { top:30% }
       .community-cards { top:52% }
       .community-cards .playing-card { width:40px !important; height:60px !important }
-      .table-pot-center { top:52% }
+      .table-pot-center { top:42% }
       .table-pot-below { top:calc(52% + 48px) }
     }
     input[type=range] { -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:#263a50; outline:none }
@@ -1628,13 +1615,6 @@ function ICMDrillMode({ onExit }) {
   );
 }
 
-function PreviewCard({ rank, suit, back, tilt = 0 }) {
-  const red = suit === '♥' || suit === '♦';
-  return <div className={`preview-card ${back ? 'back' : ''}`} style={{ transform: `rotate(${tilt}deg)` }}>
-    {back ? <span>SL</span> : <><span className={red ? 'text-rose-600' : 'text-stone-900'}>{rank}</span><span className={red ? 'text-rose-600' : 'text-stone-900'}>{suit}</span></>}
-  </div>;
-}
-
 function Lobby({ onStart, onDrill, onICM, showAdvice }) {
   const [mode, setMode] = useState('cash');
   const [trainingStyle, setTrainingStyle] = useState('challenge');
@@ -1764,6 +1744,10 @@ function App() {
 
           {state.board.length > 0 && <div className="community-cards flex min-h-[3.2rem]">
             {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
+          </div>}
+          {state.board.length === 0 && <div className="community-waiting" aria-label="等待翻牌">
+            <div className="community-slots">{Array.from({ length: 5 }).map((_, i) => <span key={i} className="community-slot" />)}</div>
+            <span className="text-[9px] font-semibold text-sky-200/40">等待翻牌</span>
           </div>}
           <div key={state.pot} className={`table-pot ${state.board.length ? 'table-pot-below' : 'table-pot-center'} flex items-center gap-1.5 text-xs font-semibold pot-pulse`}><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           <div className="table-seat table-seat-hero">
