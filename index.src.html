@@ -925,7 +925,7 @@ function resolveHand(state) {
   const lossSum = state.decisionLog.reduce((s, d) => s + (d.evLoss || 0), 0);
   const buckets = { ...(state.stats.buckets || {}) };
   for (const d of state.decisionLog) {
-    const key = `${d.streetLabel} · ${d.position}`;
+    const key = d.category || `${d.streetLabel} · ${d.position}`;
     const b = buckets[key] || { n: 0, mistakes: 0, evLoss: 0 };
     buckets[key] = { n: b.n + 1, mistakes: b.mistakes + (d.evLoss >= 0.3 ? 1 : 0), evLoss: b.evLoss + (d.evLoss || 0) };
   }
@@ -953,6 +953,7 @@ function applyAction(state, decision) {
       const label = decision.type === 'fold' ? '棄牌' : decision.type === 'check' ? '過牌' : decision.type === 'call' ? '跟注' : isAllin ? '全下' : decision.type === 'raise' ? '加注' : '下注';
       decisionLog = [...decisionLog, {
         streetLabel: state.stage === 'preflop' ? '翻前' : state.stage === 'flop' ? '翻牌' : state.stage === 'turn' ? '轉牌' : '河牌',
+        category: state.stage === 'preflop' ? (advice.effBB <= 15 ? '短碼推棄' : '翻前範圍') : state.currentBet > p.committed ? '底池賠率' : ['raise', 'bet'].includes(decision.type) ? '下注尺度' : '翻後紀律',
         position: p.position, heroLabel: label, heroFreqPct: Math.round(heroFreq * 100),
         topLabel: advice.strategy.topLabel, topFreqPct: Math.round(advice.strategy.topFreq * 100),
         evLoss, reasoning: advice.reasoning,
@@ -1269,6 +1270,48 @@ function StatBar({ stats }) {
       {weak && <p className="mt-2 border-t border-stone-800 pt-2 text-[11px] text-rose-300">
         優先練習：{weak[0]} · 錯誤 {weak[1].mistakes}/{weak[1].n} 次 · 平均損失 {(weak[1].evLoss / weak[1].n).toFixed(2)}bb
       </p>}
+    </div>
+  );
+}
+
+function FiveHandSummary({ history }) {
+  const [copied, setCopied] = useState(false);
+  if (history.length < 5) return null;
+  const hands = history.slice(-5);
+  const decisions = hands.flatMap(h => h.decisions || []);
+  const groups = {};
+  decisions.forEach(d => {
+    const key = d.category || `${d.streetLabel} · ${d.position}`;
+    const g = groups[key] || { n: 0, mistakes: 0, loss: 0 };
+    groups[key] = { n: g.n + 1, mistakes: g.mistakes + (d.evLoss >= 0.3 ? 1 : 0), loss: g.loss + d.evLoss };
+  });
+  const ranked = Object.entries(groups).sort((a, b) => b[1].mistakes - a[1].mistakes || b[1].loss - a[1].loss);
+  const weak = ranked[0];
+  const scored = hands.map(h => ({ ...h, loss: (h.decisions || []).reduce((s, d) => s + d.evLoss, 0) })).filter(h => (h.decisions || []).length);
+  const best = [...scored].sort((a, b) => a.loss - b.loss)[0];
+  const biggest = [...scored].sort((a, b) => b.loss - a.loss)[0];
+  const next = weak ? ({ '短碼推棄': '重練 10–15BB 決策', '翻前範圍': '專注位置與開池範圍', '底池賠率': '先比較勝率與底池賠率', '下注尺度': '依底池選擇下注尺度', '翻後紀律': '練習控池與邊緣棄牌' }[weak[0]] || `優先練習 ${weak[0]}`) : '再完成五手，累積決策';
+  const copyId = () => navigator.clipboard.writeText('450920').then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }).catch(() => {});
+  return (
+    <div className="training-module rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-stone-800">
+        <p className="text-[10px] font-bold tracking-wider text-teal-300">最近五手診斷</p>
+        <h2 className="mt-1 text-base font-bold text-white">{weak ? `目前最需要改善：${weak[0]}` : '繼續累積有效決策'}</h2>
+        {weak && <p className="mt-1 text-xs text-stone-400">錯誤 {weak[1].mistakes}/{weak[1].n} 次 · 損失約 {weak[1].loss.toFixed(2)}bb</p>}
+      </div>
+      <div className="grid grid-cols-2 gap-px bg-stone-800 text-xs">
+        <div className="bg-slate-950 px-3 py-2.5"><span className="text-stone-500">最佳一手</span><b className="mt-1 block text-teal-300">{best ? `第 ${best.handNum} 手 · ${best.loss.toFixed(2)}bb` : '尚無決策'}</b></div>
+        <div className="bg-slate-950 px-3 py-2.5"><span className="text-stone-500">最大偏差</span><b className="mt-1 block text-rose-300">{biggest ? `第 ${biggest.handNum} 手 · ${biggest.loss.toFixed(2)}bb` : '尚無決策'}</b></div>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-xs text-stone-300"><b className="text-amber-300">下一步：</b>{next}</p>
+        <p className="mt-3 text-[11px] text-stone-500">到 SILVER LINE 實戰。</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <a href="https://silverline-poker.netlify.app" target="_blank" rel="noreferrer" className="vivid-primary tap-target rounded-lg flex items-center justify-center text-xs font-bold">查看俱樂部</a>
+          <button onClick={copyId} className="tap-target rounded-lg border border-teal-500/50 bg-teal-950/50 text-teal-200 text-xs font-bold flex items-center justify-center gap-1.5">⧉ {copied ? '已複製' : '複製 ID 450920'}</button>
+        </div>
+        <a href="https://t.me/silverlinepokerclub" target="_blank" rel="noreferrer" className="mt-2 tap-target w-full rounded-lg border border-stone-700 text-stone-300 text-xs font-semibold flex items-center justify-center">查看 Telegram 公告</a>
+      </div>
     </div>
   );
 }
@@ -1784,6 +1827,7 @@ function App() {
         ) : state.stage === 'handover' ? (
           <div className="space-y-3">
             <ReviewPanel lines={state.lastReview} />
+            <FiveHandSummary history={state.history} />
             <button onClick={() => dispatch({ type: 'NEW_HAND' })} className="next-hand w-full rounded-lg font-semibold py-3 flex items-center justify-center gap-2">
               <RefreshCw size={16} /> 下一手
             </button>
