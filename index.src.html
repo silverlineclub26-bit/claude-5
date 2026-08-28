@@ -61,6 +61,17 @@
     .vivid-drill.teal { background: #64d8ce; }
     .vivid-drill.blue { background: #8fb8ff; }
     .vivid-drill:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #17191d; }
+    .training-shell { min-height: 100%; color: #17191d; background: #edf1ee; }
+    .training-bar { border: 2px solid #17191d; background: #ef5a46; box-shadow: 4px 4px 0 #17191d; }
+    .training-felt { border: 2px solid #17191d !important; box-shadow: inset 0 0 0 5px #174c40, inset 0 0 0 7px #75c6ae, 5px 6px 0 #17191d !important; }
+    .player-avatar { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid #17191d; border-radius: 50%; color: #17191d; background: #f8d748; box-shadow: 2px 2px 0 #17191d; font: 700 13px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
+    .avatar-1 { background: #64d8ce; }.avatar-2 { background: #f8d748; }.avatar-3 { background: #8fb8ff; }.avatar-0 { background: #ef5a46; color: white; }
+    .avatar-acting { transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 3px #fff, 3px 4px 0 #17191d; }
+    .vivid-action { border: 2px solid #17191d; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
+    .vivid-fold { background: #ef5a46 !important; }.vivid-call { background: #64d8ce !important; }.vivid-raise { background: #f8d748 !important; }
+    .training-shell .close-button { border: 2px solid #17191d; background: #fff; color: #17191d; box-shadow: 2px 2px 0 #17191d; }
+    .training-shell .action-dock { border: 2px solid #17191d; background: #fff; box-shadow: 4px 4px 0 #17191d; }
+    .training-shell .bright-panel { border: 2px solid #17191d; background: #fff; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
     .lobby-shell .lobby-table { border-color: #17191d; box-shadow: inset 0 0 0 6px #174c40, inset 0 0 0 8px #75c6ae, 7px 8px 0 #17191d; animation: tableRise .5s ease-out both; }
     .lobby-shell .seat-dot { border: 2px solid #17191d; background: #f8d748; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
     .lobby-shell .seat-dot:nth-of-type(2) { background: #64d8ce; }
@@ -1019,12 +1030,13 @@ function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
     </div>
   );
   return (
-    <div className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg transition ${player.folded ? 'opacity-35' : ''} ${isActor ? 'bg-amber-400/10 ring-1 ring-amber-400/50' : ''} ${isWinner ? 'win-glow' : ''}`}>
+    <div className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg transition ${player.folded ? 'opacity-35' : ''} ${isWinner ? 'win-glow' : ''}`}>
+      <div className={`player-avatar avatar-${player.idx} ${isActor ? 'avatar-acting' : ''}`}>{isHero ? '♠' : ['','T','L','C'][player.idx]}</div>
       <div className="flex items-center gap-1 whitespace-nowrap">
         <span className="text-stone-200 text-[13px] font-medium">{player.name}</span>
         {player.position && <span className={`text-[12px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
-        {!isHero && player.style && <span className="text-stone-500 text-[11px]">({STYLE_LABEL[player.style]})</span>}
       </div>
+      {!isHero && player.style && <span className="rounded-full bg-black/35 px-1.5 py-0.5 text-[9px] font-medium text-stone-300">{STYLE_LABEL[player.style]}</span>}
       <div className="flex gap-0.5">
         {player.cards.map((c, i) => <CardFace key={i} card={c} hidden={!showCards} size={isHero ? 'lg' : 'sm'} animate={animate} />)}
       </div>
@@ -1279,13 +1291,13 @@ function ActionFeed({ feed }) {
   const [open, setOpen] = useState(false);
   const latest = feed[feed.length - 1];
   return (
-    <div className="rounded-lg bg-[#111318] border border-white/[.07] overflow-hidden">
+    <div className="bright-panel rounded-lg overflow-hidden">
       <button onClick={() => setOpen(!open)} className="tap-target w-full flex items-center justify-between gap-3 px-3 text-left">
-        <span className="min-w-0 truncate text-xs text-stone-400"><b className="mr-2 text-stone-600 font-medium">最新</b>{latest}</span>
+        <span className="min-w-0 truncate text-xs text-[#555b59]"><b className="mr-2 text-[#17191d] font-bold">最新</b>{latest}</span>
         {open ? <ChevronUp size={15} className="shrink-0 text-stone-600" /> : <ChevronDown size={15} className="shrink-0 text-stone-600" />}
       </button>
-      {open && <div className="max-h-36 overflow-y-auto border-t border-white/[.06] px-3 py-2">
-        {feed.map((f, i) => <p key={i} className={`text-xs leading-relaxed ${i === feed.length - 1 ? 'text-stone-300' : 'text-stone-600'}`}>{f}</p>)}
+      {open && <div className="max-h-36 overflow-y-auto border-t border-black/10 px-3 py-2">
+        {feed.map((f, i) => <p key={i} className={`text-xs leading-relaxed ${i === feed.length - 1 ? 'text-[#17191d]' : 'text-[#7b817e]'}`}>{f}</p>)}
       </div>}
     </div>
   );
@@ -1321,15 +1333,15 @@ function BetControl({ stage, pot, bb, currentBet, heroCommitted, heroStack, last
   if (maxTotal <= currentBet) return null; // 無法再加注
 
   if (!open) return (
-    <button onClick={() => setOpen(true)} className="tap-target flex-1 min-w-[5rem] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold whitespace-nowrap px-2">
+    <button onClick={() => setOpen(true)} className="vivid-action vivid-raise tap-target flex-1 min-w-[5rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">
       {label} ⋯
     </button>
   );
   return (
-    <div className="w-full rounded-lg border border-amber-600/50 bg-amber-950/20 p-3 space-y-2.5">
+    <div className="bright-panel w-full rounded-lg p-3 space-y-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-amber-200 text-xs">{label}至</span>
-        <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
+        <span className="text-[#555b59] text-xs">{label}至</span>
+        <span className="text-[#17191d] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
       </div>
       <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
       <div className="grid grid-cols-4 gap-1.5">
@@ -1410,19 +1422,19 @@ function DrillMode({ onExit }) {
   const worst = Object.entries(stats.buckets).filter(([, b]) => b.n >= 3).sort((a, b) => (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
 
   return (
-    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="training-shell px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-md mx-auto space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="training-bar rounded-lg flex items-center justify-between px-3 py-2">
           <div>
-            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>短碼 Drill</h1>
-            <p className="text-stone-500 text-xs">單挑推/棄 · 真 Nash 計分</p>
+            <h1 className="font-bold text-lg text-white" style={{ fontFamily: "'Noto Serif TC', serif" }}>短碼推棄</h1>
+            <p className="text-white/70 text-xs">單挑 · Nash 即時判分</p>
           </div>
           <button onClick={onExit} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
 
         {!ready || !spot ? <p className="text-stone-500 text-sm py-8 text-center">載入 Nash 資料中…</p> : (
           <>
-            <div className="felt rounded-lg p-4 flex flex-col items-center gap-3">
+            <div className="felt training-felt rounded-lg p-4 flex flex-col items-center gap-3">
               <p className="text-stone-300 text-sm">
                 有效 <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{spot.E}bb</span> · 單挑 ·
                 {spot.facing ? ' 對手全下，你要…' : ' 輪到你首入，要…'}
@@ -1434,8 +1446,8 @@ function DrillMode({ onExit }) {
 
             {!result ? (
               <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
-                <button onClick={() => answer(false)} className="tap-target rounded-lg bg-rose-600 hover:bg-rose-500 text-white px-3 text-sm font-semibold">棄牌</button>
-                <button onClick={() => answer(true)} className="tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
+                <button onClick={() => answer(false)} className="vivid-action vivid-fold tap-target rounded-lg px-3 text-sm font-semibold">棄牌</button>
+                <button onClick={() => answer(true)} className="vivid-action vivid-raise tap-target rounded-lg px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1531,18 +1543,18 @@ function ICMDrillMode({ onExit }) {
   const worst = Object.entries(stats.buckets).filter(([, b]) => b.n >= 3).sort((a, b) => (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
 
   return (
-    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="training-shell px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-md mx-auto space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="training-bar rounded-lg flex items-center justify-between px-3 py-2">
           <div>
-            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>ICM Drill</h1>
-            <p className="text-stone-500 text-xs">3人決賽桌 · 即時 ICM 解 · 獎金池%計分</p>
+            <h1 className="font-bold text-lg text-white" style={{ fontFamily: "'Noto Serif TC', serif" }}>決賽桌 ICM</h1>
+            <p className="text-white/70 text-xs">3 人桌 · 獎金池即時判分</p>
           </div>
           <button onClick={onExit} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
         {!ready || !spot ? <p className="text-stone-500 text-sm py-8 text-center">載入勝率表 / 求解中…</p> : (
           <>
-            <div className="felt rounded-lg p-4 flex flex-col items-center gap-2">
+            <div className="felt training-felt rounded-lg p-4 flex flex-col items-center gap-2">
               <p className="text-stone-400 text-[11px]">決賽桌 3 人 · 獎金 {spot.payouts.join('/')}（%獎池）</p>
               <p className="text-stone-300 text-sm text-center" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 你 <span className="text-amber-300 font-bold">{spot.heroS}bb</span> · 對手 {spot.villS}bb · BTN {spot.btnS}bb
@@ -1552,8 +1564,8 @@ function ICMDrillMode({ onExit }) {
             </div>
             {!result ? (
               <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
-                <button onClick={() => answer(false)} className="tap-target rounded-lg bg-rose-600 hover:bg-rose-500 text-white px-3 text-sm font-semibold">棄牌</button>
-                <button onClick={() => answer(true)} className="tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
+                <button onClick={() => answer(false)} className="vivid-action vivid-fold tap-target rounded-lg px-3 text-sm font-semibold">棄牌</button>
+                <button onClick={() => answer(true)} className="vivid-action vivid-raise tap-target rounded-lg px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1715,19 +1727,19 @@ function App() {
   );
 
   return (
-    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="training-shell px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-md mx-auto space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="training-bar rounded-lg flex items-center justify-between px-3 py-2">
           <div>
-            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>Silver Line 銀線陪練桌</h1>
-            <p className="text-stone-500 text-xs">
+            <h1 className="font-bold text-lg text-white" style={{ fontFamily: "'Noto Serif TC', serif" }}>銀線陪練桌</h1>
+            <p className="text-white/70 text-xs">
               {state.mode === 'tournament' ? `錦標賽 · Level ${level}（${state.sb}/${state.bb}${state.ante ? `，前注 ${state.ante}` : ''}） · ${activeCount} 人桌` : `現金桌 · 盲注 ${state.sb}/${state.bb} · ${activeCount} 人桌`}
             </p>
           </div>
           <button onClick={() => dispatch({ type: 'TO_LOBBY' })} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
 
-        <div className="felt rounded-lg p-3">
+        <div className="felt training-felt rounded-lg p-3">
           {/* 圍成一圈：上=對手B、左=對手A、右=對手C、下=你，公牌在正中央 */}
           <div className="flex justify-center min-h-[4.2rem] items-start">{oppSeat(2)}</div>
 
@@ -1753,9 +1765,9 @@ function App() {
         <ActionFeed feed={state.feed} />
 
         {heroActive && (
-          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="tap-target flex-1 min-w-[4rem] rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold whitespace-nowrap px-2">棄牌</button>
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="tap-target flex-1 min-w-[4rem] rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
+          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg p-1.5">
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="vivid-action vivid-fold tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">棄牌</button>
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="vivid-action vivid-call tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
             <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
               onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
           </div>
