@@ -67,10 +67,10 @@
     .training-felt::after { content: "SILVER LINE  •  TRAINING TABLE"; position: absolute; left: 50%; top: 49%; transform: translate(-50%,-50%); color: rgba(255,255,255,.15); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .12em; white-space: nowrap; }
     .training-table { height:min(62vh,540px); min-height:470px; border-color:#343c48 !important; border-radius:44% / 15% !important; background:radial-gradient(ellipse at 50% 45%,#123f51 0,#0a2c3d 52%,#071b2a 100%) !important; box-shadow:inset 0 0 0 2px rgba(218,190,135,.36),inset 0 0 58px rgba(0,10,22,.68),0 0 0 3px #111722,0 22px 45px rgba(0,0,0,.58) !important }
     .training-table::after { z-index:0; top:61%; color:rgba(255,255,255,.12) }
-    .table-seat { position:absolute !important; z-index:2; width:112px; display:flex; justify-content:center }
+    .table-seat { position:absolute !important; z-index:2; width:104px; display:flex; justify-content:center }
     .table-seat-top { left:50%; top:10px; transform:translateX(-50%) }
-    .table-seat-left { left:-14px; top:43%; transform:translateY(-50%) }
-    .table-seat-right { right:-14px; top:43%; transform:translateY(-50%) }
+    .table-seat-left { left:0; top:43%; transform:translateY(-50%) }
+    .table-seat-right { right:0; top:43%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
     .community-cards { position:absolute !important; z-index:3; left:50%; top:50%; transform:translate(-50%,-50%); gap:3px; padding:6px; border:1px solid rgba(116,183,211,.22); border-radius:8px; background:rgba(3,13,23,.28); box-shadow:inset 0 0 18px rgba(0,0,0,.2) }
     .table-pot { position:absolute !important; z-index:3; left:50%; top:calc(50% + 44px); transform:translateX(-50%); white-space:nowrap }
@@ -83,13 +83,14 @@
     .player-avatar::after { content: ""; position: absolute; width: 16px; height: 7px; bottom: 8px; border-bottom: 2px solid currentColor; border-radius: 50%; opacity: .75; }
     .avatar-1 { color:#62e6db; background:linear-gradient(145deg,#176b72,#102638) }.avatar-2 { color:#ffd86b; background:linear-gradient(145deg,#725322,#211b22) }.avatar-3 { color:#91b8ff; background:linear-gradient(145deg,#315d9d,#141d38) }.avatar-0 { color:#ff8a78; background:linear-gradient(145deg,#923f45,#2b1722); border-color:#ff8a78 }
     .avatar-acting { transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 3px #f4c95d,0 0 22px rgba(244,201,93,.6); }
-    .seat-nameplate { border:1px solid rgba(125,147,174,.36); border-radius:999px; background:rgba(4,11,22,.86); padding:2px 7px; box-shadow:0 5px 12px rgba(0,0,0,.28) }
-    .vivid-action { border: 1px solid rgba(255,255,255,.14); color: #f8fafc; box-shadow: 0 8px 18px rgba(0,0,0,.24); }
-    .vivid-fold { background: #263447 !important; }.vivid-call { background: #087f78 !important; }.vivid-raise { background: #e4534b !important; }
-    .vivid-action:active { transform:translateY(1px); filter:brightness(1.08) }
+    .seat-nameplate { border:1px solid rgba(125,147,174,.36); border-radius:999px; background:rgba(4,11,22,.9); padding:3px 8px; box-shadow:0 5px 12px rgba(0,0,0,.32) }
+    .vivid-action { min-height:54px; border:1px solid rgba(255,255,255,.16); border-radius:7px !important; color:#f8fafc; box-shadow:inset 0 1px rgba(255,255,255,.12),0 8px 18px rgba(0,0,0,.3); font-weight:700 !important; letter-spacing:0 }
+    .vivid-fold { background:linear-gradient(#344257,#202b3c) !important }.vivid-call { background:linear-gradient(#0d978d,#076c69) !important }.vivid-raise { background:linear-gradient(#f06458,#c83e3c) !important }
+    .vivid-action:active { transform:translateY(2px); box-shadow:inset 0 1px rgba(255,255,255,.08),0 3px 8px rgba(0,0,0,.3) }
     .training-shell .close-button { border: 1px solid #34445a; background: #111c2c; color: #aebdce; box-shadow:none; }
-    .training-shell .action-dock { border: 1px solid #2b3b50; background: rgba(8,15,27,.94); box-shadow: 0 12px 35px rgba(0,0,0,.48); }
-    .training-shell .bright-panel { border: 1px solid #29394e; background: rgba(12,22,37,.92); color: #eef3fa; box-shadow: 0 10px 26px rgba(0,0,0,.22); }
+    .training-shell .action-dock { border:1px solid #34475e; background:rgba(7,14,26,.96); box-shadow:0 14px 38px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.05) }
+    .training-shell .bright-panel,.training-module { border:1px solid #29394e !important; background:linear-gradient(145deg,rgba(15,27,45,.96),rgba(7,14,25,.96)) !important; color:#eef3fa; box-shadow:0 10px 26px rgba(0,0,0,.22) }
+    .next-hand { min-height:54px; border:1px solid #f17b70; background:linear-gradient(135deg,#f06458,#d34240); color:white; box-shadow:0 10px 24px rgba(211,66,64,.25),inset 0 1px rgba(255,255,255,.18) }
     .lobby-shell .lobby-table { border-color: #17191d; box-shadow: inset 0 0 0 6px #174c40, inset 0 0 0 8px #75c6ae, 7px 8px 0 #17191d; animation: tableRise .5s ease-out both; }
     .lobby-shell .seat-dot { border: 2px solid #17191d; background: #f8d748; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
     .lobby-shell .seat-dot:nth-of-type(2) { background: #64d8ce; }
@@ -104,9 +105,9 @@
       .deal-in, .pot-pulse, .win-glow, .lobby-table, .preview-card, .preview-chip { animation: none !important; }
       * { scroll-behavior: auto !important; }
     }
-    input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #134e4a; outline: none; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
-    input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
+    input[type=range] { -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:#263a50; outline:none }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:24px; height:24px; border-radius:50%; background:#ef6258; border:3px solid #ffd3ce; box-shadow:0 3px 10px rgba(239,98,88,.35); cursor:pointer }
+    input[type=range]::-moz-range-thumb { width:24px; height:24px; border-radius:50%; background:#ef6258; border:3px solid #ffd3ce; cursor:pointer }
   </style>
 </head>
 <body>
@@ -1082,7 +1083,7 @@ function InfoNum({ children, tip, color }) {
 
 function AdvicePanel({ advice, show, onToggle }) {
   return (
-    <div className="rounded-lg border border-teal-700/50 bg-teal-950/60 backdrop-blur-sm overflow-hidden">
+    <div className="training-module rounded-lg backdrop-blur-sm overflow-hidden">
       <button onClick={onToggle} className="tap-target w-full flex items-center justify-between px-4 bg-teal-800/40 text-teal-100 text-sm font-medium">
         <span className="flex items-center gap-2"><Info size={15} /> 教練建議</span>
         {show ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -1237,7 +1238,7 @@ function PostflopSpotViewer() {
 function ReviewPanel({ lines }) {
   if (!lines || lines.length === 0) return null;
   return (
-    <div className="rounded-xl border border-amber-700/40 bg-amber-950/30 px-4 py-3 space-y-1.5">
+    <div className="training-module rounded-xl px-4 py-3 space-y-1.5">
       <p className="text-amber-300 text-sm font-semibold flex items-center gap-1.5"><Heart size={15} /> 本手短評</p>
       {lines.map((l, i) => <p key={i} className="text-amber-100/85 text-xs leading-relaxed">{l}</p>)}
     </div>
@@ -1251,7 +1252,7 @@ function StatBar({ stats }) {
   const weak = Object.entries(stats.buckets || {}).filter(([, b]) => b.n >= 2)
     .sort((a, b) => (b[1].mistakes / b[1].n) - (a[1].mistakes / a[1].n) || (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
   return (
-    <div className="rounded-xl border border-stone-700/50 bg-slate-900/60 px-4 py-2.5">
+    <div className="training-module rounded-xl px-4 py-2.5">
       <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="text-stone-300 font-medium">GTO 契合度 · 已玩 {stats.hands} 手</span>
         <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>平均每手 EV 損失 ≈ {avg.toFixed(2)}bb</span>
@@ -1274,7 +1275,7 @@ function HandHistory({ history }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   return (
-    <div className="rounded-xl border border-stone-700/50 bg-slate-900/60">
+    <div className="training-module rounded-xl">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-stone-300 text-sm font-medium">
         <span>對局紀錄（{history.length}）</span>{open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
@@ -1362,13 +1363,13 @@ function BetControl({ stage, pot, bb, currentBet, heroCommitted, heroStack, last
       <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
       <div className="grid grid-cols-4 gap-1.5">
         {presets.map(p => (
-          <button key={p.k} onClick={() => setAmount(clamp(p.total))} className="tap-target rounded-lg border border-amber-700/60 text-amber-300 text-[11px] px-1">{p.k}</button>
+          <button key={p.k} onClick={() => setAmount(clamp(p.total))} className="tap-target rounded-lg border border-slate-600 bg-slate-800/70 text-slate-200 text-[11px] px-1">{p.k}</button>
         ))}
         <button onClick={() => setAmount(maxTotal)} className="tap-target rounded-lg border border-rose-600/70 text-rose-300 text-[11px] px-1">All-in</button>
       </div>
       <div className="grid grid-cols-2 gap-2 pt-0.5">
         <button onClick={() => setOpen(false)} className="tap-target rounded-lg border border-stone-600 text-stone-300 text-sm">取消</button>
-        <button onClick={() => { onBet(type, amount); setOpen(false); }} className="tap-target rounded-lg bg-amber-600 text-slate-950 text-sm font-semibold">
+        <button onClick={() => { onBet(type, amount); setOpen(false); }} className="next-hand tap-target rounded-lg text-sm font-semibold">
           {amount >= maxTotal ? 'All-in' : `${label} ${amount}`}
         </button>
       </div>
@@ -1788,7 +1789,7 @@ function App() {
         {state.trainingStyle === 'guided' ? (
           <AdvicePanel advice={heroActive ? advice : null} show={state.showAdvice} onToggle={() => dispatch({ type: 'TOGGLE_ADVICE' })} />
         ) : heroActive ? (
-          <div className="rounded-lg border border-amber-400/20 bg-amber-400/[.04] px-3 py-2.5 text-xs text-stone-400 flex items-center gap-2">
+          <div className="training-module rounded-lg px-3 py-2.5 text-xs text-stone-400 flex items-center gap-2">
             <Heart size={14} className="text-amber-300" /><span><b className="text-stone-200">先作答模式</b> · 建議與 EV 會在本手覆盤揭曉</span>
           </div>
         ) : null}
@@ -1813,7 +1814,7 @@ function App() {
         ) : state.stage === 'handover' ? (
           <div className="space-y-3">
             <ReviewPanel lines={state.lastReview} />
-            <button onClick={() => dispatch({ type: 'NEW_HAND' })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-3 flex items-center justify-center gap-2">
+            <button onClick={() => dispatch({ type: 'NEW_HAND' })} className="next-hand w-full rounded-lg font-semibold py-3 flex items-center justify-center gap-2">
               <RefreshCw size={16} /> 下一手
             </button>
           </div>
