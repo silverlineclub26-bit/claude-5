@@ -15,7 +15,9 @@
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
   <style>
     html, body, #root { height: 100%; }
-    body { background: #020617; margin: 0; -webkit-tap-highlight-color: transparent; }
+    :root { color-scheme: dark; }
+    body { background: #07090d; color: #e7e5e4; margin: 0; -webkit-tap-highlight-color: transparent; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .24; background-image: repeating-linear-gradient(115deg, transparent 0 7px, rgba(255,255,255,.012) 7px 8px); }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: rgba(120,113,108,.4); border-radius: 3px; }
     @keyframes dealIn { from { opacity: 0; transform: translateY(-8px) scale(.9); } to { opacity: 1; transform: none; } }
@@ -24,6 +26,24 @@
     .deal-in { animation: dealIn .28s ease-out both; }
     .pot-pulse { animation: potPulse .5s ease-out; }
     .win-glow { animation: winGlow 1.4s ease-in-out infinite; border-radius: .5rem; }
+    .tap-target { min-height: 48px; touch-action: manipulation; }
+    .app-shell { background: #07090d; }
+    .panel { background: #111318; border: 1px solid #292c33; box-shadow: 0 14px 40px rgba(0,0,0,.2); }
+    .felt { position: relative; overflow: hidden; background-color: #063d32; border: 1px solid #19705e; box-shadow: inset 0 0 0 3px #0a241f, inset 0 0 0 4px rgba(216,180,92,.35), 0 18px 44px rgba(0,0,0,.38); }
+    .felt::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .3; background-image: repeating-linear-gradient(35deg, transparent 0 5px, rgba(255,255,255,.018) 5px 6px); }
+    .felt > * { position: relative; }
+    .brand-mark { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #b58a35; border-radius: 50%; color: #e8c66a; background: #111318; box-shadow: 0 0 0 4px #1a1c21, 0 10px 30px rgba(0,0,0,.35); font-family: Georgia, serif; font-size: 25px; }
+    .mode-card { background: #111318; border: 1px solid #292c33; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
+    .mode-card:active { transform: translateY(1px); }
+    .eyebrow { color: #9a9ca3; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; }
+    .icon-well { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 8px; }
+    .close-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #292c33; border-radius: 8px; background: #111318; }
+    .action-dock { padding-bottom: max(.375rem, env(safe-area-inset-bottom)); backdrop-filter: blur(14px); }
+    .rounded-xl, .rounded-2xl { border-radius: .5rem !important; }
+    @media (prefers-reduced-motion: reduce) {
+      .deal-in, .pot-pulse, .win-glow { animation: none !important; }
+      * { scroll-behavior: auto !important; }
+    }
     input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #134e4a; outline: none; }
     input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
     input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #f59e0b; border: 2px solid #78350f; cursor: pointer; }
@@ -340,6 +360,241 @@ function pushThreshold(pos, effBB, facingAllIn) {
   return posBase + wide * (0.88 - posBase);
 }
 
+/* ============================================================
+   翻前範圍表（Step 2）：以標準範圍記法編入各位置策略，
+   解析成 169 手牌各自的 加注/跟注/棄牌，供建議 + 13×13 網格共用。
+   —— 策劃的近似範圍（非 solver 精解），Step 3 接真 solver 才精確。
+   ============================================================ */
+const GRID_ORDER = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']; // 高→低
+const gi = (ch) => GRID_ORDER.indexOf(ch);
+// 展開單一 token：支援 "22"/"22+"/"ATs"/"ATs+"/"KJo+"/"76s"（"+" 為固定高牌、踢腳往上）
+function expandToken(tok, out) {
+  tok = tok.trim(); if (!tok) return;
+  const plus = tok.endsWith('+'); if (plus) tok = tok.replace('+', '');
+  if (tok.length === 2 && tok[0] === tok[1]) {          // 對子
+    const hi = gi(tok[0]);
+    if (plus) for (let r = hi; r >= 0; r--) out.add(GRID_ORDER[r] + GRID_ORDER[r]);
+    else out.add(tok[0] + tok[1]);
+    return;
+  }
+  const a = tok[0], b = tok[1], suit = tok[2];           // 帶花色 s/o
+  const hi = gi(a), lo = gi(b);
+  if (!plus) { out.add(a + b + suit); return; }
+  for (let k = lo; k > hi; k--) out.add(a + GRID_ORDER[k] + suit); // 固定高牌，踢腳 b→(高牌下一位)
+}
+function expandRange(str) { const out = new Set(); for (const t of str.split(',')) expandToken(t, out); return out; }
+
+// 開池（RFI）範圍
+const PREFLOP_RFI = {
+  UTG: '55+, A9s+, KTs+, QTs+, J9s+, T9s, 98s, AJo+, KQo',
+  BTN: '22+, A2s+, K5s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, 54s, A8o+, K9o+, Q9o+, J9o+, T9o',
+  SB: '22+, A2s+, K7s+, Q9s+, J9s+, T8s+, 98s, 87s, 76s, 65s, A9o+, KTo+, QTo+, JTo',
+  'BTN/SB': '22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 86s+, 75s+, 64s+, 54s, A2o+, K5o+, Q8o+, J8o+, T8o+, 98o, 87o',
+};
+// 面對加注：3-bet 範圍 + 跟注範圍（3-bet 優先，跟注可寫寬，交集由優先序切走）
+const PREFLOP_3BET = {
+  BB: '99+, AJs+, KQs, A5s, A4s, AQo+',
+  SB: '88+, ATs+, KJs+, A5s, AQo+, KQo',
+  BTN: 'TT+, AQs+, AJs, A5s, AKo',
+  UTG: 'QQ+, AKs, AKo',
+};
+const PREFLOP_CALL = {
+  BB: '22+, A2s+, K7s+, Q8s+, J8s+, T8s+, 97s+, 86s+, 76s, 65s, 54s, A8o+, K9o+, Q9o+, J9o+, T9o',
+  SB: '',
+  BTN: '22+, A9s+, KTs+, QTs+, J9s+, T9s, 98s, 87s, AJo+, KQo',
+  UTG: 'TT+, AJs+, KQs, AQo+',
+};
+const RFI_SETS = {}, TB_SETS = {}, CALL_SETS = {};
+for (const k in PREFLOP_RFI) RFI_SETS[k] = expandRange(PREFLOP_RFI[k]);
+for (const k in PREFLOP_3BET) TB_SETS[k] = expandRange(PREFLOP_3BET[k]);
+for (const k in PREFLOP_CALL) CALL_SETS[k] = expandRange(PREFLOP_CALL[k]);
+
+// 是否有此情境的範圍表（沒有就退回 Step 1 的 EV 引擎）
+function hasChart(pos, facingRaise) {
+  return facingRaise ? !!(TB_SETS[pos] || CALL_SETS[pos]) : !!RFI_SETS[pos];
+}
+// 回傳 StrategyNode（與 buildStrategy 同形狀）：ev 為 freq×SCALE 的代理值，evIsProxy=true
+function preflopStrategyNode(pos, facingRaise, code) {
+  const SCALE = 1.5; // 範圍不符的 EV 損失代理值（bb）；真 solver 進來會用實際 EV（Step 3）
+  let raise = 0, call = 0;
+  if (!facingRaise) {
+    raise = (RFI_SETS[pos] && RFI_SETS[pos].has(code)) ? 1 : 0;
+  } else {
+    if (TB_SETS[pos] && TB_SETS[pos].has(code)) raise = 1;
+    else if (CALL_SETS[pos] && CALL_SETS[pos].has(code)) call = 1;
+  }
+  const fold = Math.max(0, 1 - raise - call);
+  const raiseLabel = facingRaise ? '3-bet 加注' : '加注（open）';
+  const actions = [
+    { key: 'raise', label: raiseLabel, freq: raise, ev: raise * SCALE },
+    { key: 'call', label: '跟注', freq: call, ev: call * SCALE },
+    { key: 'fold', label: '棄牌', freq: fold, ev: fold * SCALE },
+  ];
+  actions.sort((x, y) => y.freq - x.freq);
+  return { actions, maxEV: Math.max(...actions.map(a => a.ev)), topKey: actions[0].key, topFreq: actions[0].freq, topLabel: actions[0].label, evIsProxy: true };
+}
+// 網格用：某位置/情境下,169 手牌各自的主要動作 key（raise/call/fold）
+function gridCode(i, j) { return i === j ? GRID_ORDER[i] + GRID_ORDER[i] : (i < j ? GRID_ORDER[i] + GRID_ORDER[j] + 's' : GRID_ORDER[j] + GRID_ORDER[i] + 'o'); }
+function gridActionKey(pos, facingRaise, code) { return preflopStrategyNode(pos, facingRaise, code).topKey; }
+
+/* ============================================================
+   短碼推/棄 Nash 表（Step 3）：離線 solver 解出、部署時 fetch 載入。
+   真 solver 輸出（非近似）；heads-up（numOpp===1）時精確。
+   ============================================================ */
+let PUSHFOLD = null; // { codes, stacks, tables, codeIndex }（fetch 後填入）
+function pfNearestStack(effBB) {
+  let best = PUSHFOLD.stacks[0];
+  for (const s of PUSHFOLD.stacks) if (Math.abs(s - effBB) < Math.abs(best - effBB)) best = s;
+  return best;
+}
+// 回傳 StrategyNode（evIsProxy=false，真 EV）：facingShove→跟/棄；否則→全下/棄
+function pushFoldNode(effBB, code, facingShove) {
+  if (!PUSHFOLD) return null;
+  const i = PUSHFOLD.codeIndex[code];
+  if (i == null) return null;
+  const t = PUSHFOLD.tables[pfNearestStack(effBB)];
+  if (!t) return null;
+  const freq = (facingShove ? t.call[i] : t.shove[i]) / 100;
+  const edge = (facingShove ? t.callEdge[i] : t.shoveEdge[i]) / 100; // bb：該動作相對棄牌的 EV 差
+  const aggr = facingShove
+    ? { key: 'call', label: '跟注全下', freq, ev: edge }
+    : { key: 'allin', label: '全下', freq, ev: edge };
+  const actions = [aggr, { key: 'fold', label: '棄牌', freq: 1 - freq, ev: 0 }].sort((a, b) => b.freq - a.freq);
+  return { actions, maxEV: Math.max(edge, 0), topKey: actions[0].key, topFreq: actions[0].freq, topLabel: actions[0].label, evIsProxy: false, source: 'pushfold' };
+}
+// 網格用：某堆疊下 169 手牌是否全下（供推/棄 Nash 網格）
+function pushFoldGridKey(effBB, code, facingShove) {
+  const n = pushFoldNode(effBB, code, facingShove);
+  if (!n) return 'fold';
+  return n.topKey === 'fold' ? 'fold' : (facingShove ? 'call' : 'raise');
+}
+
+/* ============================================================
+   ICM 即時求解（Step 3）：勝率表 fetch 載入後，3人決賽桌推/棄用 ICM$ 在瀏覽器即時解
+   ============================================================ */
+let EQ = null; // { N, codes, codeIndex, full:Float64Array(N*N) }
+function loadEQ(data) {
+  const N = data.n, codes = data.codes, tri = data.tri, full = new Float64Array(N * N);
+  let t = 0;
+  for (let a = 0; a < N; a++) for (let b = a; b < N; b++) { const v = tri[t++] / 1000; full[a * N + b] = v; full[b * N + a] = 1 - v; }
+  const codeIndex = {}; codes.forEach((c, i) => { codeIndex[c] = i; });
+  EQ = { N, codes, codeIndex, full };
+}
+function combosOf(c) { return c.length === 2 ? 6 : (c[2] === 's' ? 4 : 12); }
+function eqVsR(i, freq) { const N = EQ.N; let n = 0, d = 0; for (let k = 0; k < N; k++) { const w = freq[k]; if (w <= 0) continue; const ww = w * combosOf(EQ.codes[k]); n += ww * EQ.full[i * N + k]; d += ww; } return d > 0 ? n / d : 0.5; }
+function wFreqE(freq) { const N = EQ.N; let n = 0, d = 0; for (let k = 0; k < N; k++) { const c = combosOf(EQ.codes[k]); n += freq[k] * c; d += c; } return n / d; }
+function icmEq(stacks, payouts) {
+  const n = stacks.length, eq = new Array(n).fill(0);
+  if (!payouts.length || !n) return eq;
+  const total = stacks.reduce((a, b) => a + b, 0); if (total <= 0) return eq;
+  for (let i = 0; i < n; i++) {
+    const p = stacks[i] / total; eq[i] += p * payouts[0];
+    if (payouts.length > 1 && n > 1) { const rest = stacks.filter((_, j) => j !== i); const re = icmEq(rest, payouts.slice(1)); let ri = 0; for (let j = 0; j < n; j++) { if (j === i) continue; eq[j] += p * re[ri++]; } }
+  }
+  return eq;
+}
+function heroICMv(hero, bb, btn, payouts, who) {
+  const arr = [{ s: hero, who: 'H' }, { s: bb, who: 'B' }, { s: btn, who: 'T' }];
+  const live = arr.filter(x => x.s > 0), dead = arr.filter(x => x.s <= 0);
+  const extra = {}; if (dead.length) extra[dead[0].who] = payouts[payouts.length - 1];
+  const le = icmEq(live.map(x => x.s), payouts.slice(0, live.length));
+  const m = {}; live.forEach((x, i) => { m[x.who] = le[i]; }); Object.assign(m, extra);
+  return m[who] || 0;
+}
+// 3人 SB推 vs BB 的 ICM Nash + 每手 edge（ICM$，單位＝獎金池%）
+function solveICMapp(hero, bbStack, btn, sb, bb, payouts, iters = 400) {
+  const N = EQ.N, E = Math.min(hero, bbStack);
+  const sumSh = new Float64Array(N), sumCa = new Float64Array(N);
+  const avgSh = new Float64Array(N).fill(1), avgCa = new Float64Array(N);
+  const evFold = heroICMv(hero - sb, bbStack + sb, btn, payouts, 'H');
+  const evShoveBBfold = heroICMv(hero + bb, bbStack - bb, btn, payouts, 'H');
+  const evWin = heroICMv(hero + E, bbStack - E, btn, payouts, 'H');
+  const evLose = heroICMv(hero - E, bbStack + E, btn, payouts, 'H');
+  const bbEvFold = heroICMv(hero + bb, bbStack - bb, btn, payouts, 'B');
+  const bbWin = heroICMv(hero - E, bbStack + E, btn, payouts, 'B');
+  const bbLose = heroICMv(hero + E, bbStack - E, btn, payouts, 'B');
+  for (let t = 1; t <= iters; t++) {
+    const caBR = new Float64Array(N);
+    for (let k = 0; k < N; k++) { const e = eqVsR(k, avgSh); caBR[k] = (e * bbWin + (1 - e) * bbLose >= bbEvFold) ? 1 : 0; }
+    const pCall = wFreqE(avgCa);
+    const shBR = new Float64Array(N);
+    for (let h = 0; h < N; h++) { const e = eqVsR(h, avgCa); const ev = (1 - pCall) * evShoveBBfold + pCall * (e * evWin + (1 - e) * evLose); shBR[h] = (ev >= evFold) ? 1 : 0; }
+    for (let k = 0; k < N; k++) { sumSh[k] += shBR[k]; sumCa[k] += caBR[k]; avgSh[k] = sumSh[k] / t; avgCa[k] = sumCa[k] / t; }
+  }
+  const pCall = wFreqE(avgCa);
+  const shoveEdge = new Float64Array(N), callEdge = new Float64Array(N);
+  for (let h = 0; h < N; h++) {
+    const e = eqVsR(h, avgCa);
+    shoveEdge[h] = ((1 - pCall) * evShoveBBfold + pCall * (e * evWin + (1 - e) * evLose)) - evFold;
+    const ec = eqVsR(h, avgSh);
+    callEdge[h] = (ec * bbWin + (1 - ec) * bbLose) - bbEvFold;
+  }
+  return { shove: avgSh, call: avgCa, shoveEdge, callEdge };
+}
+
+/* ============================================================
+   策略引擎（Step 1）：把單一建議升級成「動作分布 + EV + 頻率」
+   —— 資料合約 StrategyNode.actions = [{ key, label, ev(bb), freq }]
+   —— 這是 StrategyProvider 的第一個 provider（啟發式，近似）；
+      之後接真 solver（Step 3）只需換掉 ev 來源，UI / 評分不用動。
+   ============================================================ */
+// 用 equity + 底池幾何 + MDF 折疊權益，替每個合法動作算 EV（籌碼）
+function actionEVs({ pot, callAmt, eq, heroStack, numOpp }) {
+  const P = pot, c = callAmt, canCheck = c === 0;
+  const acts = [];
+  if (canCheck) acts.push({ key: 'check', label: '過牌', ev: eq * P });
+  else {
+    acts.push({ key: 'fold', label: '棄牌', ev: 0 });
+    acts.push({ key: 'call', label: '跟注', ev: eq * (P + c) - c });
+  }
+  // 進攻動作：一個代表尺寸（下注 ⅔ 池 / 加注 ~¾ 池）
+  let a = canCheck
+    ? Math.round(0.66 * P)
+    : c + Math.round(0.75 * (P + c));
+  a = Math.min(Math.max(a, canCheck ? 1 : c + 1), heroStack); // 不超過自身籌碼
+  const allin = a >= heroStack;
+  const betFaced = canCheck ? a : (a - c);                 // 對手實際要跟的量
+  // 折疊權益:MDF 隱含折疊率 × 0.5 折扣（避免把「詐唬垃圾牌」高估成最佳），多人再降
+  let fe = 0.5 * betFaced / (P + betFaced);
+  fe = Math.min(0.75, Math.max(0, Math.pow(fe, Math.max(1, numOpp))));
+  const calledPot = canCheck ? (P + 2 * a) : (P + 2 * a - c);
+  const evAggr = fe * P + (1 - fe) * (eq * calledPot - a);
+  acts.push({ key: allin ? 'allin' : (canCheck ? 'bet' : 'raise'), label: allin ? '全下' : (canCheck ? '下注' : '加注'), ev: evAggr });
+  return acts;
+}
+// softmax(EV) → 頻率；EV 換成 bb 單位，溫度越小策略越純
+function buildStrategy(pot, callAmt, eq, heroStack, numOpp, bb) {
+  const acts = actionEVs({ pot, callAmt, eq, heroStack, numOpp });
+  acts.forEach(a => { a.ev = a.ev / bb; });                 // 籌碼 → bb
+  const maxEV = Math.max(...acts.map(a => a.ev));
+  const T = 0.6;                                            // bb；越小越接近純策略
+  let sum = 0;
+  acts.forEach(a => { a._w = Math.exp((a.ev - maxEV) / T); sum += a._w; });
+  acts.forEach(a => { a.freq = a._w / sum; delete a._w; });
+  acts.sort((x, y) => y.freq - x.freq);
+  return { actions: acts, maxEV, topKey: acts[0].key, topFreq: acts[0].freq, topLabel: acts[0].label };
+}
+// 英雄出手 → 對應到策略裡的動作 key
+function heroActionKey(decision, maxTotal) {
+  if (decision.type === 'fold') return 'fold';
+  if (decision.type === 'check') return 'check';
+  if (decision.type === 'call') return 'call';
+  if (decision.amount != null && decision.amount >= maxTotal) return 'allin';
+  return decision.type === 'bet' ? 'bet' : 'raise';
+}
+// 依 GTO Wizard 指標評分：evLoss（bb）+ 該點頻率
+function scoreHeroAction(strategy, key, bb) {
+  let act = strategy.actions.find(a => a.key === key);
+  if (!act) {
+    const aggr = ['bet', 'raise', 'allin'];
+    act = aggr.includes(key)
+      ? strategy.actions.find(a => aggr.includes(a.key))
+      : strategy.actions.find(a => a.key === 'check' || a.key === 'call' || a.key === 'fold');
+  }
+  if (!act) return { evLoss: 0, heroFreq: 0 };
+  return { evLoss: Math.max(0, strategy.maxEV - act.ev), heroFreq: act.freq };
+}
+
 function computeAdvice(state) {
   if (!state.actingOrder || state.actingOrder.length === 0) return null;
   const actorIdx = state.actingOrder[state.actIdxPtr % state.actingOrder.length];
@@ -357,17 +612,38 @@ function computeAdvice(state) {
     const topPct = Math.max(1, Math.round(pct * 100));
     const pos = hero.position;
     const eq = equityVsN(hero.cards, [], numOpp, 140);
-    const equity = Math.round((eq.win + eq.tie * 0.5) * 100);
+    const eqFloat = eq.win + eq.tie * 0.5;
+    const equity = Math.round(eqFloat * 100);
+    const strategy = buildStrategy(state.pot, callAmt, eqFloat, hero.stack, numOpp, bb);
     const oppStacks = oppsIn.map(o => o.stack + o.committed);
     const effBB = (oppStacks.length ? Math.min(hero.stack + hero.committed, Math.max(...oppStacks)) : hero.stack) / bb;
     const facingRaise = state.raiseCount > 0;
     let action, reasoning;
 
+    // Step 3：短碼且單挑（HU）→ 用真 Nash 推/棄表（精確）
+    if (effBB <= 15 && PUSHFOLD && numOpp === 1) {
+      const pf = pushFoldNode(effBB, code, facingRaise);
+      if (pf) {
+        reasoning = `有效 ${effBB.toFixed(1)}bb 單挑 · ${facingRaise ? '面對全下' : '短碼首入'}：${code} → Nash「${pf.topLabel}」（${Math.round(pf.topFreq * 100)}%）。真 solver 解。`;
+        return { action: pf.topLabel, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB), strategy: pf, bb };
+      }
+    }
+
     if (effBB <= 12) {
       const thr = pushThreshold(pos, effBB, facingRaise);
       if (pct <= thr) { action = '全下 All-in'; reasoning = `有效籌碼僅 ${effBB.toFixed(1)}bb，屬短碼推/棄。${code} 落在 ${pos} 推牌範圍（前 ${Math.round(thr * 100)}%）內，直接全下最佳。`; }
       else { action = callAmt === 0 ? '過牌' : '棄牌'; reasoning = `有效籌碼 ${effBB.toFixed(1)}bb，${code}（前 ${topPct}%）未達 ${pos} 短碼推牌門檻（前 ${Math.round(thr * 100)}%），${callAmt === 0 ? '過牌看牌' : '棄牌'}為佳。`; }
-      return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB) };
+      return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB), strategy, bb };
+    }
+
+    // Step 2：一般深度改用範圍表（有此情境的範圍就用，否則退回 Step 1 EV 引擎）
+    if (hasChart(pos, facingRaise)) {
+      const chart = preflopStrategyNode(pos, facingRaise, code);
+      const spot = facingRaise ? '面對加注' : '開池';
+      reasoning = chart.topKey === 'fold'
+        ? `${pos} ${spot}：${code} 不在${facingRaise ? '續戰' : '開池'}範圍內，棄牌。（近似範圍表，Step 3 接真 solver 更準）`
+        : `${pos} ${spot}：${code} 落在「${chart.topLabel}」範圍。（近似範圍表，Step 3 接真 solver 更準）`;
+      return { action: chart.topLabel, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB), strategy: chart, bb };
     }
 
     if (!facingRaise) {
@@ -380,13 +656,15 @@ function computeAdvice(state) {
       else if (pct <= cp) { action = '跟注'; reasoning = `面對加注，${code}（前 ${topPct}%）在 ${pos} 跟注範圍（前 ${Math.round(cp * 100)}%），跟注看翻牌。`; }
       else { action = '棄牌'; reasoning = `面對加注，${code}（前 ${topPct}%）超出 ${pos} 續戰範圍（跟注前 ${Math.round(cp * 100)}%），棄牌。`; }
     }
-    return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB) };
+    return { action, rangePct: topPct, equity, reasoning, position: pos, numOpp, effBB: Math.round(effBB), strategy, bb };
   }
 
   // 翻後：對對手推測範圍算勝率
   const cutoffs = oppsIn.map(o => oppCutoff(o, bb));
   const eq = equityVsRange(hero.cards, state.board, cutoffs, 300);
-  const equity = Math.round((eq.win + eq.tie * 0.5) * 100);
+  const eqFloat = eq.win + eq.tie * 0.5;
+  const equity = Math.round(eqFloat * 100);
+  const strategy = buildStrategy(state.pot, callAmt, eqFloat, hero.stack, numOpp, bb);
   const potOddsNeeded = callAmt > 0 ? Math.round((callAmt / (state.pot + callAmt)) * 100) : 0;
   const readTag = numOpp === 1 ? (cutoffs[0] <= 0.25 ? '（對手動作偏強、範圍收窄）' : cutoffs[0] <= 0.45 ? '（對手範圍中等）' : '（對手範圍偏寬）') : `（對 ${numOpp} 位推測範圍）`;
   let action, reasoning;
@@ -398,7 +676,7 @@ function computeAdvice(state) {
     else if (equity >= potOddsNeeded + 2) { action = '跟注'; reasoning = `${readTag}勝率 ${equity}% 高於所需底池賠率 ${potOddsNeeded}%，跟注為正期望值。`; }
     else { action = '棄牌'; reasoning = `${readTag}勝率 ${equity}% 低於所需底池賠率 ${potOddsNeeded}%，長期負期望，建議棄牌。`; }
   }
-  return { action, equity, potOddsNeeded, reasoning, position: hero.position, numOpp };
+  return { action, equity, potOddsNeeded, callAmt, pot: state.pot, reasoning, position: hero.position, numOpp, strategy, bb };
 }
 
 /* ============================================================
@@ -411,8 +689,8 @@ const initialState = {
   board: [], deck: [], pot: 0, stage: 'idle',
   actingOrder: [], actIdxPtr: 0, currentBet: 0, lastRaiserIdx: null, raiseCount: 0, lastRaiseSize: 0,
   feed: [], history: [], decisionLog: [], lastReview: null,
-  finishOrder: [], gameOver: false, winners: [], showAdvice: true,
-  stats: { hands: 0, aligned: 0, deviated: 0 },
+  finishOrder: [], gameOver: false, winners: [], showAdvice: false, trainingStyle: 'challenge',
+  stats: { hands: 0, decisions: 0, evLoss: 0, buckets: {} },
 };
 
 function makePlayers() {
@@ -521,21 +799,19 @@ function advanceStreet(state) {
 
   return { ...state, board, deck, stage: newStage, players, feed, currentBet: 0, lastRaiserIdx: null, raiseCount: 0, lastRaiseSize: state.bb, actingOrder, actIdxPtr: 0 };
 }
-function bucket(t) { if (t === '棄牌') return 'fold'; if (t === '過牌' || t === '跟注') return 'cc'; return 'br'; }
 function coachReview(preState, finalPlayers) {
-  const heroWon = finalPlayers[0].stack > preState.players[0].stack;
-  const lines = [];
   const log = preState.decisionLog;
-  const deviations = log.filter(d => bucket(d.adviceAction) !== bucket(d.heroAction));
-  if (log.length === 0) lines.push('這手你沒有輪到需要決策的時刻。');
-  else if (deviations.length === 0) lines.push('這手每個決策方向都跟系統建議一致，紀律掌握得不錯。');
-  else for (const d of deviations.slice(0, 3)) lines.push(`${d.streetLabel}（${d.position}）：你選擇「${d.heroAction}」，建議是「${d.adviceAction}」。${d.reasoning}`);
-  if (deviations.length > 0) {
-    lines.push(heroWon
-      ? '這手結果是贏的，但採用了偏離建議的決策；長期期望值不一定站得住，建議以決策品質為主而非單手輸贏。'
-      : '這手輸了，其中偏離建議的決策值得回顧，想想是否要調整判斷標準。');
-  } else if (!heroWon) {
-    lines.push('決策採用跟建議一致，這手單純是運氣不站在你這邊，不需要懷疑打法。');
+  if (log.length === 0) return ['這手你沒有輪到需要決策的時刻。'];
+  const lines = [];
+  const totalLoss = log.reduce((s, d) => s + (d.evLoss || 0), 0);
+  const mistakes = log.filter(d => (d.evLoss || 0) >= 0.3).sort((a, b) => b.evLoss - a.evLoss);
+  if (mistakes.length === 0) {
+    lines.push(`這手每個決策都很接近 GTO，總 EV 損失僅 ≈ ${totalLoss.toFixed(1)}bb，紀律掌握得不錯。`);
+  } else {
+    for (const d of mistakes.slice(0, 3)) {
+      lines.push(`${d.streetLabel}（${d.position}）：你選「${d.heroLabel}」（該點頻率約 ${d.heroFreqPct}%），GTO 主要走「${d.topLabel}」（約 ${d.topFreqPct}%），此決策 EV 損失 ≈ ${d.evLoss.toFixed(1)}bb。${d.reasoning}`);
+    }
+    lines.push(`本手總 EV 損失 ≈ ${totalLoss.toFixed(1)}bb —— 以「每個決策少丟 EV」為目標，別在意單手輸贏。`);
   }
   return lines;
 }
@@ -573,18 +849,23 @@ function resolveHand(state) {
     for (const p of players) { if (p.stack <= 0) p.stack = STARTING_STACK; }
   }
 
+  const review = coachReview(state, players);
   const history = [...state.history, {
     handNum: state.handNum,
     hero: state.players[0].cards.map(c => c.r + SUIT_SYMBOL[c.s]).join(' '),
     board: state.board.map(c => c.r + SUIT_SYMBOL[c.s]).join(' '),
-    pot: state.pot, result: resultLines.join('；'),
+    pot: state.pot, result: resultLines.join('；'), decisions: state.decisionLog, review,
   }];
-  const review = coachReview(state, players);
 
-  // 統計：對齊 / 偏離
-  const dev = state.decisionLog.filter(d => bucket(d.adviceAction) !== bucket(d.heroAction)).length;
-  const aligned = state.decisionLog.length - dev;
-  const stats = { hands: state.stats.hands + 1, aligned: state.stats.aligned + aligned, deviated: state.stats.deviated + dev };
+  // 統計：EV 損失（bb）
+  const lossSum = state.decisionLog.reduce((s, d) => s + (d.evLoss || 0), 0);
+  const buckets = { ...(state.stats.buckets || {}) };
+  for (const d of state.decisionLog) {
+    const key = `${d.streetLabel} · ${d.position}`;
+    const b = buckets[key] || { n: 0, mistakes: 0, evLoss: 0 };
+    buckets[key] = { n: b.n + 1, mistakes: b.mistakes + (d.evLoss >= 0.3 ? 1 : 0), evLoss: b.evLoss + (d.evLoss || 0) };
+  }
+  const stats = { hands: state.stats.hands + 1, decisions: state.stats.decisions + state.decisionLog.length, evLoss: state.stats.evLoss + lossSum, buckets };
 
   return { ...state, players, history, stage: 'handover', lastReview: review, finishOrder, winners, stats, feed: [...state.feed, ...resultLines] };
 }
@@ -600,11 +881,17 @@ function applyAction(state, decision) {
 
   if (actorIdx === 0) {
     const advice = computeAdvice(state);
-    if (advice) {
-      const label = decision.type === 'fold' ? '棄牌' : decision.type === 'check' ? '過牌' : decision.type === 'call' ? '跟注' : decision.type === 'raise' ? '加注' : '下注';
+    if (advice && advice.strategy) {
+      const maxTotal = p.stack + p.committed;
+      const isAllin = decision.amount != null && decision.amount >= maxTotal;
+      const key = heroActionKey(decision, maxTotal);
+      const { evLoss, heroFreq } = scoreHeroAction(advice.strategy, key, state.bb);
+      const label = decision.type === 'fold' ? '棄牌' : decision.type === 'check' ? '過牌' : decision.type === 'call' ? '跟注' : isAllin ? '全下' : decision.type === 'raise' ? '加注' : '下注';
       decisionLog = [...decisionLog, {
         streetLabel: state.stage === 'preflop' ? '翻前' : state.stage === 'flop' ? '翻牌' : state.stage === 'turn' ? '轉牌' : '河牌',
-        position: p.position, adviceAction: advice.action, heroAction: label, reasoning: advice.reasoning,
+        position: p.position, heroLabel: label, heroFreqPct: Math.round(heroFreq * 100),
+        topLabel: advice.strategy.topLabel, topFreqPct: Math.round(advice.strategy.topFreq * 100),
+        evLoss, reasoning: advice.reasoning,
       }];
     }
   }
@@ -647,13 +934,13 @@ function applyAction(state, decision) {
 function reducer(state, action) {
   switch (action.type) {
     case 'START_SESSION':
-      return startNewHand({ ...initialState, players: makePlayers(), mode: action.mode, showAdvice: state.showAdvice, stats: { hands: 0, aligned: 0, deviated: 0 } });
+      return startNewHand({ ...initialState, players: makePlayers(), mode: action.mode, trainingStyle: action.trainingStyle, showAdvice: action.trainingStyle === 'guided', stats: { hands: 0, decisions: 0, evLoss: 0, buckets: {} } });
     case 'NEW_HAND':
       if (state.mode === 'cash' && state.players[0].stack <= 0) return { ...state, stage: 'gameover', gameOver: true };
       return startNewHand(state);
     case 'REBUY':
       return startNewHand({ ...state, players: state.players.map(p => ({ ...p, stack: STARTING_STACK, eliminated: false })), gameOver: false, finishOrder: [], handNum: 0, dealerIdx: 0 });
-    case 'TO_LOBBY': return { ...initialState, showAdvice: state.showAdvice };
+    case 'TO_LOBBY': return { ...initialState, trainingStyle: state.trainingStyle };
     case 'TOGGLE_ADVICE': return { ...state, showAdvice: !state.showAdvice };
     case 'HERO_ACT': {
       const order = state.actingOrder;
@@ -678,8 +965,8 @@ function CardFace({ card, hidden, size = 'md', dim, animate }) {
   const dims = size === 'lg' ? 'w-12 h-[4.3rem] text-lg' : size === 'sm' ? 'w-7 h-10 text-[10px]' : 'w-9 h-13 text-sm';
   const anim = animate ? 'deal-in' : '';
   if (hidden) {
-    return <div className={`${dims} ${anim} rounded-md bg-gradient-to-br from-emerald-800 to-emerald-950 border border-amber-600/40 flex items-center justify-center shadow-md ${dim ? 'opacity-40' : ''}`}>
-      <span className="text-amber-500/70 font-bold text-[8px] tracking-widest" style={{ fontFamily: "'Fraunces', serif" }}>SIL</span>
+    return <div className={`${dims} ${anim} rounded-md bg-gradient-to-br from-zinc-700 to-zinc-950 border border-zinc-500/40 flex items-center justify-center shadow-md ${dim ? 'opacity-40' : ''}`}>
+      <span className="text-zinc-300/80 font-bold text-[8px] tracking-widest" style={{ fontFamily: "'Fraunces', serif" }}>SIL</span>
     </div>;
   }
   const red = SUIT_RED[card.s];
@@ -696,31 +983,48 @@ const POS_COLOR = { BTN: 'text-amber-400', 'BTN/SB': 'text-amber-400', SB: 'text
 function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
   if (player.eliminated) return (
     <div className="flex flex-col items-center gap-1 opacity-30">
-      <p className="text-stone-500 text-[11px]">{player.name}</p>
-      <p className="text-stone-600 text-[10px]">已淘汰</p>
+      <p className="text-stone-500 text-[13px]">{player.name}</p>
+      <p className="text-stone-600 text-[11px]">已淘汰</p>
     </div>
   );
   return (
     <div className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg transition ${player.folded ? 'opacity-35' : ''} ${isActor ? 'bg-amber-400/10 ring-1 ring-amber-400/50' : ''} ${isWinner ? 'win-glow' : ''}`}>
-      <div className="flex items-center gap-1">
-        <span className="text-stone-200 text-[11px] font-medium">{player.name}</span>
-        {player.position && <span className={`text-[10px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
-        {!isHero && player.style && <span className="text-stone-500 text-[9px]">({STYLE_LABEL[player.style]})</span>}
+      <div className="flex items-center gap-1 whitespace-nowrap">
+        <span className="text-stone-200 text-[13px] font-medium">{player.name}</span>
+        {player.position && <span className={`text-[12px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
+        {!isHero && player.style && <span className="text-stone-500 text-[11px]">({STYLE_LABEL[player.style]})</span>}
       </div>
       <div className="flex gap-0.5">
         {player.cards.map((c, i) => <CardFace key={i} card={c} hidden={!showCards} size={isHero ? 'lg' : 'sm'} animate={animate} />)}
       </div>
-      <p className="text-amber-300/90 text-[11px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{player.stack.toLocaleString()}</p>
-      {player.committed > 0 && <p className="text-teal-300 text-[10px]">已押 {player.committed}</p>}
-      {player.allIn && <p className="text-rose-400 text-[9px] font-bold">ALL-IN</p>}
+      <p className="text-amber-300/90 text-[13px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{player.stack.toLocaleString()}</p>
+      {player.committed > 0 && <p className="text-teal-300 text-[12px]">已押 {player.committed}</p>}
+      {player.allIn && <p className="text-rose-400 text-[11px] font-bold">ALL-IN</p>}
     </div>
+  );
+}
+
+/* 可 hover（桌面）／可點（手機）的數字，跳出計算說明 */
+function InfoNum({ children, tip, color }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <button type="button" onClick={() => setShow(s => !s)}
+        className={`${color || 'text-teal-200'} underline decoration-dotted decoration-teal-400/50 underline-offset-2 cursor-help`}
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}>{children}</button>
+      {show && (
+        <span onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full mt-1 z-30 block w-60 rounded-lg border border-teal-600/60 bg-slate-900 px-3 py-2 text-teal-100/90 text-[11px] leading-relaxed shadow-xl"
+          style={{ fontFamily: "'Inter', sans-serif" }}>{tip}</span>
+      )}
+    </span>
   );
 }
 
 function AdvicePanel({ advice, show, onToggle }) {
   return (
-    <div className="rounded-xl border border-teal-700/50 bg-teal-950/60 backdrop-blur-sm overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-2.5 bg-teal-800/40 text-teal-100 text-sm font-medium">
+    <div className="rounded-lg border border-teal-700/50 bg-teal-950/60 backdrop-blur-sm overflow-hidden">
+      <button onClick={onToggle} className="tap-target w-full flex items-center justify-between px-4 bg-teal-800/40 text-teal-100 text-sm font-medium">
         <span className="flex items-center gap-2"><Info size={15} /> 教練建議</span>
         {show ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
@@ -730,15 +1034,141 @@ function AdvicePanel({ advice, show, onToggle }) {
             <>
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>{advice.action}</span>
-                {typeof advice.equity === 'number' && <span className="text-teal-200 text-sm" style={{ fontFamily: "'JetBrains Mono', monospace" }}>勝率 ≈ {advice.equity}%</span>}
+                {typeof advice.equity === 'number' && (
+                  <span className="text-teal-200 text-sm">勝率 ≈ <InfoNum tip={`用蒙地卡羅模擬：對「依對手動作推測的可能範圍」把剩下的公牌隨機發上百次，統計你的牌最終獲勝（含平分算一半）的比例 ≈ ${advice.equity}%。對手範圍越強、板面越不利，勝率越低。`}>{advice.equity}%</InfoNum></span>
+                )}
+                {advice.potOddsNeeded > 0 && (
+                  <span className="text-teal-200 text-sm">所需賠率 <InfoNum color="text-amber-300" tip={`底池賠率 ＝ 你要跟的 ${advice.callAmt} ÷ 跟注後總底池（${advice.pot}＋${advice.callAmt}＝${advice.pot + advice.callAmt}）＝ ${advice.potOddsNeeded}%。這是「跟注長期不虧所需的最低勝率」。你的勝率 ${advice.equity}% ${advice.equity >= advice.potOddsNeeded ? '≥' : '＜'} ${advice.potOddsNeeded}% → ${advice.equity >= advice.potOddsNeeded ? '跟注為正期望' : '跟注負期望，建議棄牌'}。`}>{advice.potOddsNeeded}%</InfoNum></span>
+                )}
                 {advice.rangePct !== undefined && <span className="text-teal-400/70 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>前 {advice.rangePct}%</span>}
                 {advice.effBB !== undefined && advice.effBB <= 12 && <span className="text-rose-400/70 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{advice.effBB}bb 短碼</span>}
                 <span className="text-teal-500/60 text-xs">對 {advice.numOpp} 位對手 · {advice.position}</span>
               </div>
               <p className="text-teal-100/80 text-sm leading-relaxed">{advice.reasoning}</p>
+              {advice.strategy && (
+                <div className="space-y-1 pt-1.5 mt-1 border-t border-teal-800/40">
+                  <p className="text-teal-300/60 text-[11px]">{advice.strategy.evIsProxy ? '範圍策略（近似 · 頻率）' : '策略分布（近似 · 頻率／EV）'}</p>
+                  {advice.strategy.actions.filter(a => a.freq >= 0.02).map(a => (
+                    <div key={a.key} className="flex items-center gap-2">
+                      <span className="text-teal-100 text-xs w-10 shrink-0">{a.label}</span>
+                      <div className="flex-1 h-3 rounded bg-slate-800 overflow-hidden">
+                        <div className="h-full bg-teal-500/80" style={{ width: `${Math.round(a.freq * 100)}%` }} />
+                      </div>
+                      <span className="text-teal-200 text-[11px] w-9 text-right shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{Math.round(a.freq * 100)}%</span>
+                      {!advice.strategy.evIsProxy && <span className="text-teal-400/60 text-[10px] w-14 text-right shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{a.ev >= 0 ? '+' : ''}{a.ev.toFixed(1)}bb</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
-          <p className="text-teal-400/50 text-xs pt-1 border-t border-teal-800/50">近似 GTO：翻前用位置範圍（勝率百分位 + 短碼 push/fold），翻後對「對手推測範圍」算勝率 + 底池賠率／MDF。非完整 solver，供訓練參考。</p>
+          <p className="text-teal-400/50 text-xs pt-1 border-t border-teal-800/50">
+            {!advice ? '引擎：翻前範圍表＋翻後 equity/MDF 近似；短碼單挑已用真 Nash 解。'
+              : advice.strategy && advice.strategy.source === 'pushfold' ? '✅ 此建議為真・Nash 推/棄解（solver 精算，非近似）——短碼單挑已上線。'
+                : advice.strategy && advice.strategy.evIsProxy ? '翻前為策劃的近似範圍表（非 solver 精解）；短碼單挑已改用真 Nash 解。翻後 solver 題庫待後續。'
+                  : '翻後以 equity＋底池幾何＋MDF 折疊權益估各動作 EV 再轉頻率（啟發式近似）；評分看 EV 損失。短碼單挑已用真 solver；翻後 solver 題庫待後續。'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 13×13 翻前範圍網格（GTO Wizard 招牌畫面）：可收合，預設收起以免擠到動作按鈕 */
+function PreflopRangeGrid({ pos, facingRaise, heroCode }) {
+  const [open, setOpen] = useState(true);
+  const COLORS = { raise: 'bg-rose-500/80', call: 'bg-teal-500/70', fold: 'bg-slate-800/70' };
+  const cells = [];
+  if (open) for (let i = 0; i < 13; i++) for (let j = 0; j < 13; j++) {
+    const code = gridCode(i, j);
+    const key = gridActionKey(pos, facingRaise, code);
+    const isHero = code === heroCode;
+    cells.push(
+      <div key={i + '-' + j}
+        className={`relative flex items-center justify-center ${COLORS[key] || COLORS.fold} ${isHero ? 'ring-2 ring-amber-300 z-10' : ''}`}
+        style={{ aspectRatio: '1 / 1' }}>
+        <span className={`text-[7px] leading-none ${key === 'fold' ? 'text-stone-500' : 'text-white/90'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{code.replace('s', '').replace('o', '')}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/60 overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-stone-200 text-sm font-medium">
+        <span>翻前範圍表 · {pos}<span className="text-stone-500 text-[11px] font-normal ml-2">{facingRaise ? '面對加注' : '開池'}{open ? '' : '（點開看 13×13）'}</span></span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          <div className="grid gap-px" style={{ gridTemplateColumns: 'repeat(13, 1fr)' }}>{cells}</div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-400">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500/80" /> {facingRaise ? '3-bet' : '加注'}</span>
+            {facingRaise && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-teal-500/70" /> 跟注</span>}
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-800/70 border border-slate-600" /> 棄牌</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm ring-2 ring-amber-300" /> 你的牌</span>
+          </div>
+          <p className="text-stone-600 text-[10px]">上三角＝同花、對角＝對子、下三角＝非同花。近似範圍表（非 solver 精解，Step 3 更準）。</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* GTO 翻後範例檢視器：讀 TexasSolver 解出的固定 spot，13×13 每格用動作頻率分段上色 */
+function PostflopSpotViewer() {
+  const [open, setOpen] = useState(false);
+  const [spot, setSpot] = useState(null);
+  const [selectedCode, setSelectedCode] = useState(null);
+  useEffect(() => {
+    if (!open || spot) return;
+    fetch('srp-btn-cbet-Kd7h2c.json').then(r => r.json()).then(setSpot).catch(() => { });
+  }, [open, spot]);
+  const actColor = (label) => label.startsWith('CHECK') ? '#64748b'
+    : label.startsWith('BET') ? (parseFloat(label.split(' ')[1]) >= 300 ? '#9f1239' : parseFloat(label.split(' ')[1]) >= 40 ? '#f43f5e' : '#f59e0b')
+      : '#f43f5e';
+  const board = spot ? spot.board.match(/../g).map(x => ({ r: x[0], s: x[1] })) : [];
+  const cells = [];
+  if (spot) for (let i = 0; i < 13; i++) for (let j = 0; j < 13; j++) {
+    const code = gridCode(i, j);
+    const f = spot.strategy[code];
+    cells.push(
+      <button key={i + '-' + j} onClick={() => f && setSelectedCode(code)} aria-label={`${code} 策略`}
+        className={`relative flex items-center justify-center overflow-hidden ${selectedCode === code ? 'ring-2 ring-inset ring-amber-300 z-10' : ''}`} style={{ aspectRatio: '1/1', background: f ? '#1e293b' : '#0f172a' }}>
+        {f && <div className="absolute inset-0 flex">
+          {f.map((fr, k) => fr > 0.001 ? <div key={k} style={{ width: (fr * 100) + '%', background: actColor(spot.actions[k]) }} /> : null)}
+        </div>}
+        <span className={`relative text-[6px] leading-none ${f ? 'text-white/90' : 'text-slate-700'}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>{code.replace('s', '').replace('o', '')}</span>
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/60 overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-stone-200 text-sm font-medium">
+        <span>GTO 翻後範例 · BTN c-bet<span className="text-stone-500 text-[11px] font-normal ml-2">{open ? '' : '（真 solver 策略）'}</span></span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          {!spot ? <p className="text-stone-500 text-xs py-2">載入中…</p> : (
+            <>
+              <div className="flex items-center gap-2 text-xs text-stone-300">
+                <span>單加注底池 · BTN vs BB · 翻牌</span>
+                <span className="flex gap-1">{board.map((c, i) => <span key={i} className={SUIT_RED[c.s] ? 'text-rose-400' : 'text-stone-100'}>{c.r}{SUIT_SYMBOL[c.s]}</span>)}</span>
+              </div>
+              <div className="grid gap-px" style={{ gridTemplateColumns: 'repeat(13, 1fr)' }}>{cells}</div>
+              {selectedCode && spot.strategy[selectedCode] && <div className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs">
+                <p className="font-semibold text-amber-300">{selectedCode} 的 GTO 混合策略</p>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-stone-300">
+                  {spot.strategy[selectedCode].map((freq, i) => freq >= 0.01 && <span key={spot.actions[i]}>{spot.actions[i]} <b className="text-teal-300">{Math.round(freq * 100)}%</b></span>)}
+                </div>
+              </div>}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-400">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#64748b' }} /> 過牌</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#f59e0b' }} /> 小注⅓池</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#f43f5e' }} /> 大注¾池</span>
+              </div>
+              <p className="text-stone-600 text-[10px]">TexasSolver 真解（可利用度～1%）。每格寬度＝各動作頻率。固定範例 spot（非即時牌局）；即時翻後 solver 待多 spot 題庫。</p>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -756,27 +1186,34 @@ function ReviewPanel({ lines }) {
 }
 
 function StatBar({ stats }) {
-  const total = stats.aligned + stats.deviated;
-  const pct = total > 0 ? Math.round((stats.aligned / total) * 100) : 0;
+  const avg = stats.hands > 0 ? stats.evLoss / stats.hands : 0;
+  // 契合度：平均每手 0bb → 100 分；≥3bb → 0 分
+  const fit = Math.max(0, Math.min(100, Math.round(100 - (avg / 3) * 100)));
+  const weak = Object.entries(stats.buckets || {}).filter(([, b]) => b.n >= 2)
+    .sort((a, b) => (b[1].mistakes / b[1].n) - (a[1].mistakes / a[1].n) || (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
   return (
     <div className="rounded-xl border border-stone-700/50 bg-slate-900/60 px-4 py-2.5">
       <div className="flex items-center justify-between text-xs mb-1.5">
-        <span className="text-stone-300 font-medium">紀律指標 · 已玩 {stats.hands} 手</span>
-        <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{pct}% 對齊建議</span>
+        <span className="text-stone-300 font-medium">GTO 契合度 · 已玩 {stats.hands} 手</span>
+        <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>平均每手 EV 損失 ≈ {avg.toFixed(2)}bb</span>
       </div>
       <div className="h-2 rounded-full bg-stone-800 overflow-hidden flex">
-        <div className="bg-teal-500 h-full transition-all" style={{ width: `${pct}%` }} />
-        <div className="bg-rose-500/70 h-full transition-all" style={{ width: `${100 - pct}%` }} />
+        <div className="bg-teal-500 h-full transition-all" style={{ width: `${fit}%` }} />
+        <div className="bg-rose-500/70 h-full transition-all" style={{ width: `${100 - fit}%` }} />
       </div>
       <div className="flex justify-between text-[10px] text-stone-500 mt-1">
-        <span>對齊 {stats.aligned}</span><span>偏離 {stats.deviated}</span>
+        <span>累計 EV 損失 {stats.evLoss.toFixed(1)}bb</span><span>{stats.decisions} 次決策</span>
       </div>
+      {weak && <p className="mt-2 border-t border-stone-800 pt-2 text-[11px] text-rose-300">
+        優先練習：{weak[0]} · 錯誤 {weak[1].mistakes}/{weak[1].n} 次 · 平均損失 {(weak[1].evLoss / weak[1].n).toFixed(2)}bb
+      </p>}
     </div>
   );
 }
 
 function HandHistory({ history }) {
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState(null);
   return (
     <div className="rounded-xl border border-stone-700/50 bg-slate-900/60">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-2.5 text-stone-300 text-sm font-medium">
@@ -786,14 +1223,39 @@ function HandHistory({ history }) {
         <div className="max-h-56 overflow-y-auto px-4 pb-3 space-y-2">
           {[...history].reverse().map((h, i) => (
             <div key={i} className="text-xs text-stone-400 border-b border-stone-800 pb-2">
-              <div className="flex justify-between"><span>第 {h.handNum} 手</span><span className="text-stone-500">底池 {h.pot}</span></div>
+              <button onClick={() => setDetail(detail === i ? null : i)} className="tap-target w-full flex items-center justify-between text-left">
+                <span>第 {h.handNum} 手 · {h.hero}</span><span className="text-stone-500 flex items-center gap-1">底池 {h.pot}{detail === i ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
+              </button>
               <div>你：{h.hero}{h.board && <span> · 公牌：{h.board}</span>}</div>
               <div className="text-amber-500/80">{h.result}</div>
+              {detail === i && <div className="mt-2 space-y-2 rounded-lg bg-slate-950/70 p-2.5">
+                {(h.decisions || []).map((d, j) => <div key={j} className={d.evLoss >= 0.3 ? 'text-rose-200' : 'text-teal-200'}>
+                  <p className="font-medium">{d.streetLabel} {d.position}：你選 {d.heroLabel} · 損失 {d.evLoss.toFixed(2)}bb</p>
+                  <p className="mt-0.5 text-stone-400 leading-relaxed">建議 {d.topLabel}（{d.topFreqPct}%）。{d.reasoning}</p>
+                </div>)}
+                {(!h.decisions || h.decisions.length === 0) && <p className="text-stone-500">這手沒有你的決策點。</p>}
+              </div>}
             </div>
           ))}
           {history.length === 0 && <p className="text-stone-500 text-xs">還沒有對局紀錄</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+function ActionFeed({ feed }) {
+  const [open, setOpen] = useState(false);
+  const latest = feed[feed.length - 1];
+  return (
+    <div className="rounded-lg bg-[#111318] border border-white/[.07] overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="tap-target w-full flex items-center justify-between gap-3 px-3 text-left">
+        <span className="min-w-0 truncate text-xs text-stone-400"><b className="mr-2 text-stone-600 font-medium">最新</b>{latest}</span>
+        {open ? <ChevronUp size={15} className="shrink-0 text-stone-600" /> : <ChevronDown size={15} className="shrink-0 text-stone-600" />}
+      </button>
+      {open && <div className="max-h-36 overflow-y-auto border-t border-white/[.06] px-3 py-2">
+        {feed.map((f, i) => <p key={i} className={`text-xs leading-relaxed ${i === feed.length - 1 ? 'text-stone-300' : 'text-stone-600'}`}>{f}</p>)}
+      </div>}
     </div>
   );
 }
@@ -811,75 +1273,345 @@ function BetControl({ stage, pot, bb, currentBet, heroCommitted, heroStack, last
   const label = stage === 'preflop' ? '加注' : isRaise ? '加注' : '下注';
   const type = stage === 'preflop' ? 'raise' : (isRaise ? 'raise' : 'bet');
 
-  const presets = [
-    { k: '½池', v: Math.round((pot * 0.5) / 10) * 10 },
-    { k: '¾池', v: Math.round((pot * 0.75) / 10) * 10 },
-    { k: '滿池', v: pot },
-  ].map(x => ({ ...x, total: Math.max(Math.min(currentBet + x.v, maxTotal), minRaiseTo) }));
+  const presets = stage === 'preflop'
+    ? [
+        { k: '2.5bb', total: Math.round(bb * 2.5) },
+        { k: '3bb', total: bb * 3 },
+        { k: currentBet > bb ? '3-bet ×3' : '4bb', total: currentBet > bb ? currentBet * 3 : bb * 4 },
+      ].map(x => ({ ...x, total: Math.max(Math.min(x.total, maxTotal), minRaiseTo) }))
+    : [
+        { k: '⅓池', v: Math.round((pot / 3) / 10) * 10 },
+        { k: '⅔池', v: Math.round((pot * 2 / 3) / 10) * 10 },
+        { k: '滿池', v: pot },
+      ].map(x => ({ ...x, total: Math.max(Math.min(currentBet + x.v, maxTotal), minRaiseTo) }));
 
   const clamp = (v) => Math.max(minRaiseTo, Math.min(maxTotal, Math.round(v / 10) * 10));
 
   if (maxTotal <= currentBet) return null; // 無法再加注
 
+  if (!open) return (
+    <button onClick={() => setOpen(true)} className="tap-target flex-1 min-w-[5rem] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold whitespace-nowrap px-2">
+      {label} ⋯
+    </button>
+  );
   return (
-    <div className="col-span-2">
-      {!open ? (
-        <button onClick={() => setOpen(true)} className="w-full rounded-lg border border-amber-600 text-amber-300 py-2.5 text-sm font-medium">
-          {label}…（可調金額）
+    <div className="w-full rounded-lg border border-amber-600/50 bg-amber-950/20 p-3 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-amber-200 text-xs">{label}至</span>
+        <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
+      </div>
+      <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
+      <div className="grid grid-cols-4 gap-1.5">
+        {presets.map(p => (
+          <button key={p.k} onClick={() => setAmount(clamp(p.total))} className="tap-target rounded-lg border border-amber-700/60 text-amber-300 text-[11px] px-1">{p.k}</button>
+        ))}
+        <button onClick={() => setAmount(maxTotal)} className="tap-target rounded-lg border border-rose-600/70 text-rose-300 text-[11px] px-1">All-in</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 pt-0.5">
+        <button onClick={() => setOpen(false)} className="tap-target rounded-lg border border-stone-600 text-stone-300 text-sm">取消</button>
+        <button onClick={() => { onBet(type, amount); setOpen(false); }} className="tap-target rounded-lg bg-amber-600 text-slate-950 text-sm font-semibold">
+          {amount >= maxTotal ? 'All-in' : `${label} ${amount}`}
         </button>
-      ) : (
-        <div className="rounded-lg border border-amber-600/50 bg-amber-950/20 p-3 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-amber-200 text-xs">{label}至</span>
-            <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
-          </div>
-          <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
-          <div className="grid grid-cols-4 gap-1.5">
-            {presets.map(p => (
-              <button key={p.k} onClick={() => setAmount(clamp(p.total))} className="rounded border border-amber-700/60 text-amber-300 text-[11px] py-1">{p.k}</button>
-            ))}
-            <button onClick={() => setAmount(maxTotal)} className="rounded border border-rose-600/70 text-rose-300 text-[11px] py-1">All-in</button>
-          </div>
-          <div className="grid grid-cols-2 gap-2 pt-0.5">
-            <button onClick={() => setOpen(false)} className="rounded-lg border border-stone-600 text-stone-300 py-2 text-sm">取消</button>
-            <button onClick={() => { onBet(type, amount); setOpen(false); }} className="rounded-lg bg-amber-600 text-slate-950 py-2 text-sm font-semibold">
-              {amount >= maxTotal ? 'All-in' : `${label} ${amount}`}
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function Lobby({ onStart, showAdvice }) {
-  const [mode, setMode] = useState('cash');
+/* ============================================================
+   短碼 Drill：發題→出招→即時 EV 計分→追蹤弱點（用 chip-EV 推/棄 Nash 資料）
+   ============================================================ */
+function stackBucket(E) { return E <= 6 ? '≤6bb' : E <= 9 ? '7-9bb' : E <= 12 ? '10-12bb' : '13-15bb'; }
+function DrillMode({ onExit }) {
+  const [ready, setReady] = useState(!!PUSHFOLD);
+  const [spot, setSpot] = useState(null);
+  const [result, setResult] = useState(null);
+  const [stats, setStats] = useState({ n: 0, correct: 0, evLoss: 0, buckets: {} });
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    if (PUSHFOLD) { setReady(true); return; }
+    fetch('pushfold-ranges.json').then(r => r.json()).then(d => { d.codeIndex = {}; d.codes.forEach((c, i) => { d.codeIndex[c] = i; }); PUSHFOLD = d; setReady(true); }).catch(() => { });
+  }, []);
+
+  const newSpot = (similarTo = null) => {
+    const stacks = PUSHFOLD.stacks;
+    const candidates = similarTo ? stacks.filter(E => stackBucket(E) === stackBucket(similarTo.E)) : stacks;
+    const E = candidates[(Math.random() * candidates.length) | 0];
+    const facing = similarTo ? similarTo.facing : Math.random() < 0.5; // 同類重練保留情境與籌碼區間
+    const deck = shuffle(makeDeck());
+    const cards = [deck[0], deck[1]];
+    return { E, facing, cards, code: handCode(cards) };
+  };
+  useEffect(() => { if (ready && !spot) setSpot(newSpot()); }, [ready, spot]);
+
+  const answer = (aggressive) => {
+    if (result) return;
+    const i = PUSHFOLD.codeIndex[spot.code], t = PUSHFOLD.tables[spot.E];
+    const freq = (spot.facing ? t.call[i] : t.shove[i]) / 100;       // 該做進攻動作的頻率
+    const edge = (spot.facing ? t.callEdge[i] : t.shoveEdge[i]) / 100; // 進攻相對棄牌的 EV(bb)
+    const heroEV = aggressive ? edge : 0, bestEV = Math.max(edge, 0);
+    const evLoss = Math.max(0, bestEV - heroEV);
+    const correct = evLoss < 0.1;
+    const bestAction = edge >= 0 ? (spot.facing ? '跟注' : '全下') : '棄牌';
+    const mixed = freq > 0.15 && freq < 0.85;
+    let reasoning = spot.facing
+      ? (edge >= 0
+        ? '跟注沒有「逼對手棄牌」的好處，只能純比勝率——你的牌對上對手全下範圍，勝率足以支付底池賠率，所以該跟。'
+        : '關鍵觀念：面對全下要比直覺更緊！你沒有籌碼壓力能逼退對手，純比勝率，而這手贏不過對手範圍 → 棄。')
+      : (edge >= 0
+        ? `${spot.E}bb 短碼首入：全下常直接拿走盲注(fold equity)，被跟時也還有勝率。籌碼越短、盲注相對越大，全下範圍越寬。`
+        : `這手不夠強：被跟時勝率不足，而 ${spot.E}bb 還沒短到「隨便都能推」。棄牌保留籌碼，等更好的牌或位置。`);
+    if (mixed) reasoning += `（進攻頻率 ${Math.round(freq * 100)}% 屬臨界手——GTO 是混合打法，兩種選擇都接近正確，別糾結單一手。）`;
+    const errorType = correct ? null : aggressive ? '範圍過鬆：把應棄牌的邊緣牌打得太積極' : '範圍過緊：錯過可獲利的進攻或跟注';
+    setResult({ correct, evLoss, freq, bestAction, edge, reasoning, errorType });
+    setStreak(s => correct ? s + 1 : 0);
+    setStats(s => {
+      const key = (spot.facing ? '面對全下' : '首入') + ' · ' + stackBucket(spot.E);
+      const b = s.buckets[key] || { n: 0, evLoss: 0 };
+      return { n: s.n + 1, correct: s.correct + (correct ? 1 : 0), evLoss: s.evLoss + evLoss, buckets: { ...s.buckets, [key]: { n: b.n + 1, evLoss: b.evLoss + evLoss } } };
+    });
+  };
+  const next = () => { setResult(null); setSpot(newSpot()); };
+  const retrySimilar = () => { const previous = spot; setResult(null); setSpot(newSpot(previous)); };
+
+  const acc = stats.n ? Math.round((stats.correct / stats.n) * 100) : 0;
+  const avgLoss = stats.n ? (stats.evLoss / stats.n) : 0;
+  const worst = Object.entries(stats.buckets).filter(([, b]) => b.n >= 3).sort((a, b) => (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
+
   return (
-    <div className="min-h-full bg-slate-950 flex items-center justify-center px-4 py-8" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-md w-full space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="text-3xl font-bold text-amber-400" style={{ fontFamily: "'Fraunces', serif" }}>Silver Line 銀線陪練桌</h1>
-          <p className="text-stone-400 text-sm">4 人桌 · 對戰 AI · 位置制 + 即時建議 + 每手覆盤</p>
+    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md mx-auto space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>短碼 Drill</h1>
+            <p className="text-stone-500 text-xs">單挑推/棄 · 真 Nash 計分</p>
+          </div>
+          <button onClick={onExit} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
-        <div className="space-y-2">
-          <p className="text-stone-300 text-sm font-medium">賽制模式</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setMode('cash')} className={`rounded-lg border px-4 py-3 text-sm flex flex-col items-center gap-1.5 transition ${mode === 'cash' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-stone-700 text-stone-400'}`}>
-              <Coins size={18} /> 現金桌
-              <span className="text-[11px] text-stone-500">固定盲注，破產可買入</span>
-            </button>
-            <button onClick={() => setMode('tournament')} className={`rounded-lg border px-4 py-3 text-sm flex flex-col items-center gap-1.5 transition ${mode === 'tournament' ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-stone-700 text-stone-400'}`}>
-              <Trophy size={18} /> 錦標賽
-              <span className="text-[11px] text-stone-500">盲注遞增，淘汰制</span>
+
+        {!ready || !spot ? <p className="text-stone-500 text-sm py-8 text-center">載入 Nash 資料中…</p> : (
+          <>
+            <div className="felt rounded-lg p-4 flex flex-col items-center gap-3">
+              <p className="text-stone-300 text-sm">
+                有效 <span className="text-amber-300 font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{spot.E}bb</span> · 單挑 ·
+                {spot.facing ? ' 對手全下，你要…' : ' 輪到你首入，要…'}
+              </p>
+              <div className="flex gap-1.5 py-1">
+                {spot.cards.map((c, i) => <CardFace key={i} card={c} size="lg" />)}
+              </div>
+            </div>
+
+            {!result ? (
+              <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
+                <button onClick={() => answer(false)} className="tap-target rounded-lg bg-rose-600 hover:bg-rose-500 text-white px-3 text-sm font-semibold">棄牌</button>
+                <button onClick={() => answer(true)} className="tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className={`rounded-xl border px-4 py-3 ${result.correct ? 'border-teal-700/60 bg-teal-950/40' : 'border-rose-700/60 bg-rose-950/40'}`}>
+                  <p className={`font-semibold text-sm ${result.correct ? 'text-teal-300' : 'text-rose-300'}`}>{result.correct ? '✓ 正確' : '✗ 偏離 GTO'}</p>
+                  {result.errorType && <p className="mt-1.5 rounded-md bg-rose-950/60 px-2.5 py-2 text-xs font-medium text-rose-200">錯誤方向：{result.errorType}</p>}
+                  <p className="text-stone-200 text-sm mt-1">GTO：<span className="text-amber-300 font-bold">{result.bestAction}</span>（該點進攻頻率 {Math.round(result.freq * 100)}%） · 你這手 EV 損失 ≈ <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{result.evLoss.toFixed(2)}bb</span></p>
+                  <p className="text-teal-100/70 text-xs mt-1.5 leading-relaxed">{result.reasoning}</p>
+                </div>
+                <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
+                  {!result.correct && <button onClick={retrySimilar} className="tap-target rounded-lg border border-teal-600 text-teal-200 px-2 text-sm font-semibold">同類再練</button>}
+                  <button onClick={next} className={`tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-3 ${result.correct ? 'col-span-2' : ''}`}>下一題</button>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-stone-700/50 bg-slate-900/60 px-4 py-2.5 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-300 font-medium">已練 {stats.n} 題</span>
+                <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>連對 {streak} · 正確率 {acc}%</span>
+              </div>
+              {worst && <p className="text-rose-300/80 text-[11px]">最弱環節：{worst[0]}（平均丟 {(worst[1].evLoss / worst[1].n).toFixed(2)}bb，{worst[1].n} 題）</p>}
+            </div>
+            <p className="text-stone-600 text-[10px] text-center">單挑推/棄為真 Nash 精算（chip-EV）。ICM 版與更多情境陸續加入。</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ICM 短碼 Drill：3人決賽桌，隨機配置即時解 ICM 推/棄，用獎金池% 計分 */
+const ICM_PAYOUTS = [[50, 30, 20], [45, 30, 25], [60, 25, 15]];
+function ICMDrillMode({ onExit }) {
+  const [ready, setReady] = useState(!!EQ);
+  const [spot, setSpot] = useState(null);
+  const [result, setResult] = useState(null);
+  const [stats, setStats] = useState({ n: 0, correct: 0, evLoss: 0, buckets: {} });
+  const [streak, setStreak] = useState(0);
+  const rint = (lo, hi) => lo + ((Math.random() * (hi - lo + 1)) | 0);
+
+  useEffect(() => {
+    if (EQ) { setReady(true); return; }
+    fetch('eqtable.json').then(r => r.json()).then(d => { loadEQ(d); setReady(true); }).catch(() => { });
+  }, []);
+
+  const newSpot = (similarTo = null) => {
+    const facing = similarTo ? similarTo.facing : Math.random() < 0.5;
+    let heroS = rint(5, 13);
+    if (similarTo) { while (stackBucket(heroS) !== stackBucket(similarTo.heroS)) heroS = rint(5, 13); }
+    const villS = rint(5, 13), btnS = rint(8, 25);
+    const payouts = similarTo ? similarTo.payouts : ICM_PAYOUTS[(Math.random() * ICM_PAYOUTS.length) | 0];
+    // facing=false → 你是SB(shover)：solve(hero, vill, btn)；facing=true → 你是BB(caller)：solve(vill, hero, btn)
+    const sol = facing ? solveICMapp(villS, heroS, btnS, 0.5, 1, payouts) : solveICMapp(heroS, villS, btnS, 0.5, 1, payouts);
+    const deck = shuffle(makeDeck());
+    const cards = [deck[0], deck[1]];
+    return { facing, heroS, villS, btnS, payouts, sol, cards, code: handCode(cards) };
+  };
+  useEffect(() => { if (ready && !spot) setSpot(newSpot()); }, [ready, spot]);
+
+  const answer = (aggressive) => {
+    if (result) return;
+    const i = EQ.codeIndex[spot.code];
+    const freq = spot.facing ? spot.sol.call[i] : spot.sol.shove[i];
+    const edge = spot.facing ? spot.sol.callEdge[i] : spot.sol.shoveEdge[i]; // ICM$（獎金池%）
+    const heroEV = aggressive ? edge : 0, bestEV = Math.max(edge, 0);
+    const evLoss = Math.max(0, bestEV - heroEV);
+    const correct = evLoss < 0.15;
+    const bestAction = edge >= 0 ? (spot.facing ? '跟注' : '全下') : '棄牌';
+    const mixed = freq > 0.15 && freq < 0.85;
+    let reasoning = spot.facing
+      ? (edge >= 0 ? '面對全下只能純比勝率(沒有 fold equity)。這手對上對手範圍勝率夠 → 跟。'
+        : '面對全下要很緊：純比勝率、又要承擔出局風險，這手贏不過對手範圍 → 棄。')
+      : (edge >= 0 ? '短碼首入能直接拿走盲注(fold equity)，可推得寬。'
+        : '這手被跟時勝率不足，首入全下不划算 → 棄。');
+    reasoning += `　▶ ICM 關鍵：決賽桌出局＝掉獎金階梯，所以${spot.facing ? '跟注' : '推/跟'}都要比 chip-EV 更緊——同一手牌在現金桌可能該推、決賽桌卻該棄。`;
+    const minS = Math.min(spot.villS, spot.btnS);
+    if (minS <= 7) reasoning += `這桌有人只剩 ${minS}bb 快出局，ICM 壓力更大，更該讓對手先冒險出局。`;
+    if (mixed) reasoning += `（進攻頻率 ${Math.round(freq * 100)}% 屬臨界混合手，兩種都接近正確。）`;
+    const errorType = correct ? null : aggressive ? 'ICM 過鬆：低估出局成本與獎金階梯壓力' : 'ICM 過緊：這個籌碼配置仍允許你施壓';
+    setResult({ correct, evLoss, freq, bestAction, reasoning, errorType });
+    setStreak(s => correct ? s + 1 : 0);
+    setStats(s => {
+      const key = (spot.facing ? '面對全下' : '首入') + ' · ' + stackBucket(spot.heroS);
+      const b = s.buckets[key] || { n: 0, evLoss: 0 };
+      return { n: s.n + 1, correct: s.correct + (correct ? 1 : 0), evLoss: s.evLoss + evLoss, buckets: { ...s.buckets, [key]: { n: b.n + 1, evLoss: b.evLoss + evLoss } } };
+    });
+  };
+  const next = () => { setResult(null); setSpot(newSpot()); };
+  const retrySimilar = () => { const previous = spot; setResult(null); setSpot(newSpot(previous)); };
+  const acc = stats.n ? Math.round((stats.correct / stats.n) * 100) : 0;
+  const avgLoss = stats.n ? (stats.evLoss / stats.n) : 0;
+  const worst = Object.entries(stats.buckets).filter(([, b]) => b.n >= 3).sort((a, b) => (b[1].evLoss / b[1].n) - (a[1].evLoss / a[1].n))[0];
+
+  return (
+    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md mx-auto space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-amber-400 font-bold text-lg" style={{ fontFamily: "'Fraunces', serif" }}>ICM Drill</h1>
+            <p className="text-stone-500 text-xs">3人決賽桌 · 即時 ICM 解 · 獎金池%計分</p>
+          </div>
+          <button onClick={onExit} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
+        </div>
+        {!ready || !spot ? <p className="text-stone-500 text-sm py-8 text-center">載入勝率表 / 求解中…</p> : (
+          <>
+            <div className="felt rounded-lg p-4 flex flex-col items-center gap-2">
+              <p className="text-stone-400 text-[11px]">決賽桌 3 人 · 獎金 {spot.payouts.join('/')}（%獎池）</p>
+              <p className="text-stone-300 text-sm text-center" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                你 <span className="text-amber-300 font-bold">{spot.heroS}bb</span> · 對手 {spot.villS}bb · BTN {spot.btnS}bb
+              </p>
+              <p className="text-stone-200 text-sm">{spot.facing ? '你在 BB，對手全下 → 你要…' : '你在 SB 首入 → 要…'}</p>
+              <div className="flex gap-1.5 py-1">{spot.cards.map((c, i) => <CardFace key={i} card={c} size="lg" />)}</div>
+            </div>
+            {!result ? (
+              <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
+                <button onClick={() => answer(false)} className="tap-target rounded-lg bg-rose-600 hover:bg-rose-500 text-white px-3 text-sm font-semibold">棄牌</button>
+                <button onClick={() => answer(true)} className="tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 text-sm font-semibold">{spot.facing ? '跟注全下' : '全下'}</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className={`rounded-xl border px-4 py-3 ${result.correct ? 'border-teal-700/60 bg-teal-950/40' : 'border-rose-700/60 bg-rose-950/40'}`}>
+                  <p className={`font-semibold text-sm ${result.correct ? 'text-teal-300' : 'text-rose-300'}`}>{result.correct ? '✓ 正確' : '✗ 偏離 ICM-GTO'}</p>
+                  {result.errorType && <p className="mt-1.5 rounded-md bg-rose-950/60 px-2.5 py-2 text-xs font-medium text-rose-200">錯誤方向：{result.errorType}</p>}
+                  <p className="text-stone-200 text-sm mt-1">ICM 建議：<span className="text-amber-300 font-bold">{result.bestAction}</span>（進攻頻率 {Math.round(result.freq * 100)}%） · EV 損失 ≈ <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{result.evLoss.toFixed(2)}%</span> 獎池</p>
+                  <p className="text-teal-100/70 text-xs mt-1.5 leading-relaxed">{result.reasoning}</p>
+                </div>
+                <div className="action-dock sticky bottom-2 z-20 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
+                  {!result.correct && <button onClick={retrySimilar} className="tap-target rounded-lg border border-teal-600 text-teal-200 px-2 text-sm font-semibold">同類再練</button>}
+                  <button onClick={next} className={`tap-target rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-3 ${result.correct ? 'col-span-2' : ''}`}>下一題</button>
+                </div>
+              </div>
+            )}
+            <div className="rounded-xl border border-stone-700/50 bg-slate-900/60 px-4 py-2.5 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-300 font-medium">已練 {stats.n} 題</span>
+                <span className="text-teal-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>連對 {streak} · 正確率 {acc}%</span>
+              </div>
+              {worst && <p className="text-rose-300/80 text-[11px]">最弱環節：{worst[0]}（平均丟 {(worst[1].evLoss / worst[1].n).toFixed(2)}%，{worst[1].n} 題）</p>}
+            </div>
+            <p className="text-stone-600 text-[10px] text-center">3人決賽桌 SB推/BB跟 · 瀏覽器即時 ICM 精算（Nash）。每題隨機配置。</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Lobby({ onStart, onDrill, onICM, showAdvice }) {
+  const [mode, setMode] = useState('cash');
+  const [trainingStyle, setTrainingStyle] = useState('challenge');
+  return (
+    <div className="app-shell min-h-full px-4 py-6 sm:py-10" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md w-full mx-auto space-y-5">
+        <header className="flex items-center gap-4 py-2">
+          <div className="brand-mark">♠</div>
+          <div className="min-w-0">
+            <p className="eyebrow mb-1">Decision training room</p>
+            <h1 className="text-2xl font-bold text-stone-100 leading-none" style={{ fontFamily: "'Fraunces', serif" }}>銀線陪練桌</h1>
+            <p className="mt-1.5 text-stone-500 text-xs">讀懂每個決策，不只看單手輸贏</p>
+          </div>
+        </header>
+
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-0.5"><p className="eyebrow">牌桌對戰</p><span className="text-[10px] text-stone-600">4 人桌 · AI 對手</span></div>
+          <div className="panel rounded-lg p-2.5 space-y-2.5">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-black/25 p-1" role="tablist" aria-label="賽制模式">
+              <button onClick={() => setMode('cash')} className={`tap-target rounded-md text-sm font-semibold transition ${mode === 'cash' ? 'bg-stone-100 text-stone-950 shadow' : 'text-stone-500'}`}>現金桌</button>
+              <button onClick={() => setMode('tournament')} className={`tap-target rounded-md text-sm font-semibold transition ${mode === 'tournament' ? 'bg-stone-100 text-stone-950 shadow' : 'text-stone-500'}`}>錦標賽</button>
+            </div>
+            <div className="grid grid-cols-2 gap-1 border-t border-white/[.06] pt-2" role="tablist" aria-label="學習方式">
+              <button onClick={() => setTrainingStyle('challenge')} className={`tap-target rounded-md px-2 text-left ${trainingStyle === 'challenge' ? 'bg-amber-400/10 text-amber-200 ring-1 ring-amber-400/40' : 'text-stone-500'}`}>
+                <b className="block text-xs">先作答</b><span className="block mt-0.5 text-[10px] font-normal opacity-70">覆盤才揭曉答案</span>
+              </button>
+              <button onClick={() => setTrainingStyle('guided')} className={`tap-target rounded-md px-2 text-left ${trainingStyle === 'guided' ? 'bg-teal-400/10 text-teal-200 ring-1 ring-teal-400/40' : 'text-stone-500'}`}>
+                <b className="block text-xs">教練陪打</b><span className="block mt-0.5 text-[10px] font-normal opacity-70">決策前可看提示</span>
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-1 text-xs">
+              <span className="text-stone-400">{mode === 'cash' ? '固定盲注 · 隨時重新買入' : '盲注遞增 · 淘汰賽制'}</span>
+              <span className="text-amber-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{mode === 'cash' ? '50 / 100' : 'LEVEL UP'}</span>
+            </div>
+            <button onClick={() => onStart(mode, trainingStyle)} className="tap-target w-full rounded-lg bg-amber-400 hover:bg-amber-300 text-[#15120a] font-bold px-4 flex items-center justify-between transition">
+              <span className="flex items-center gap-2"><span className="text-base">♠</span> 進入牌桌</span><span aria-hidden="true">→</span>
             </button>
           </div>
+        </section>
+
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-0.5"><p className="eyebrow">專項訓練</p><span className="text-[10px] text-stone-600">即時判分</span></div>
+          <div className="grid gap-2.5">
+            <button onClick={onDrill} className="mode-card tap-target rounded-lg p-3.5 text-left flex items-center gap-3 transition">
+              <span className="icon-well bg-teal-950 text-teal-300"><RefreshCw size={18} /></span>
+              <span className="flex-1 min-w-0"><b className="block text-sm text-stone-100">短碼推棄</b><span className="block mt-0.5 text-[11px] text-stone-500">首入／面對全下 · Nash EV</span></span>
+              <span className="text-stone-600">→</span>
+            </button>
+            <button onClick={onICM} className="mode-card tap-target rounded-lg p-3.5 text-left flex items-center gap-3 transition">
+              <span className="icon-well bg-rose-950/70 text-rose-300"><Trophy size={18} /></span>
+              <span className="flex-1 min-w-0"><b className="block text-sm text-stone-100">決賽桌 ICM</b><span className="block mt-0.5 text-[11px] text-stone-500">3 人桌 · 獎金階梯壓力</span></span>
+              <span className="text-stone-600">→</span>
+            </button>
+          </div>
+        </section>
+
+        <div className="flex items-center justify-between border-t border-white/[.06] pt-4 text-[10px] text-stone-600">
+          <span>起始籌碼 {STARTING_STACK.toLocaleString()}</span><span>個人練習 · 非真錢遊戲</span>
         </div>
-        <div className="rounded-lg border border-stone-700 px-4 py-3 text-xs text-stone-400 space-y-1">
-          <p>對手為混合風格桌：<span className="text-stone-300">緊</span> / <span className="text-stone-300">鬆</span> / <span className="text-stone-300">跟注站</span> 各一位</p>
-          <p>4 人桌位置每輪輪動：BTN → SB → BB → UTG</p>
-        </div>
-        <button onClick={() => onStart(mode)} className="w-full rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-3 transition">開始練習</button>
-        <p className="text-stone-600 text-xs text-center">起始籌碼 {STARTING_STACK.toLocaleString()} · {mode === 'tournament' ? '盲注每 8 手升一級' : '盲注固定 50/100'}</p>
       </div>
     </div>
   );
@@ -888,6 +1620,18 @@ function Lobby({ onStart, showAdvice }) {
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const botTimer = useRef(null);
+  const [pfReady, setPfReady] = useState(!!PUSHFOLD);
+  const [inDrill, setInDrill] = useState(false);
+  const [inICM, setInICM] = useState(false);
+
+  // 載入短碼推/棄 Nash 表（Step 3）：部署時與 index.html 同目錄
+  useEffect(() => {
+    if (PUSHFOLD) { setPfReady(true); return; }
+    fetch('pushfold-ranges.json').then(r => r.json()).then(d => {
+      d.codeIndex = {}; d.codes.forEach((c, i) => { d.codeIndex[c] = i; });
+      PUSHFOLD = d; setPfReady(true);
+    }).catch(() => { });
+  }, []);
 
   const order = state.actingOrder;
   const actorIdx = order && order.length > 0 ? order[state.actIdxPtr % order.length] : undefined;
@@ -895,14 +1639,18 @@ function App() {
   useEffect(() => {
     if (!['preflop', 'flop', 'turn', 'river'].includes(state.stage)) return;
     if (actorIdx !== 0 && actorIdx !== undefined) {
-      botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), 600);
+      // 你已棄牌/出局→這手對你已結束，快轉剩下的機器人流程，直接跳到教練覆盤＋下一手
+      const heroOut = state.players[0] && (state.players[0].folded || state.players[0].eliminated);
+      botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), heroOut ? 45 : 600);
       return () => clearTimeout(botTimer.current);
     }
   }, [state.actIdxPtr, state.actingOrder, state.stage, actorIdx]);
 
-  const advice = useMemo(() => computeAdvice(state), [state.actIdxPtr, state.actingOrder, state.stage, state.board.length, state.pot, state.currentBet, state.raiseCount]);
+  const advice = useMemo(() => computeAdvice(state), [state.actIdxPtr, state.actingOrder, state.stage, state.board.length, state.pot, state.currentBet, state.raiseCount, pfReady]);
 
-  if (state.screen === 'lobby') return <Lobby onStart={(mode) => dispatch({ type: 'START_SESSION', mode })} showAdvice={state.showAdvice} />;
+  if (inDrill) return <DrillMode onExit={() => setInDrill(false)} />;
+  if (inICM) return <ICMDrillMode onExit={() => setInICM(false)} />;
+  if (state.screen === 'lobby') return <Lobby onStart={(mode, trainingStyle) => dispatch({ type: 'START_SESSION', mode, trainingStyle })} onDrill={() => setInDrill(true)} onICM={() => setInICM(true)} showAdvice={state.showAdvice} />;
 
   const activeCount = state.players.filter(p => !p.eliminated).length;
   const level = state.mode === 'tournament' ? Math.min(Math.floor(state.handNum / HANDS_PER_LEVEL), TOURNEY_SCHEDULE.length - 1) + 1 : null;
@@ -911,9 +1659,15 @@ function App() {
   const callAmt = heroActive ? Math.max(state.currentBet - hero.committed, 0) : 0;
   const canCheck = callAmt === 0;
   const showdownReveal = state.stage === 'handover';
+  const oppSeat = (i) => (
+    <Seat player={state.players[i]} isHero={false}
+      showCards={showdownReveal && !state.players[i].folded && !state.players[i].eliminated}
+      isActor={actorIdx === i && !showdownReveal}
+      isWinner={showdownReveal && state.winners.includes(i)} />
+  );
 
   return (
-    <div className="min-h-full bg-slate-950 px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="app-shell min-h-full px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-md mx-auto space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -922,22 +1676,19 @@ function App() {
               {state.mode === 'tournament' ? `錦標賽 · Level ${level}（${state.sb}/${state.bb}${state.ante ? `，前注 ${state.ante}` : ''}） · ${activeCount} 人桌` : `現金桌 · 盲注 ${state.sb}/${state.bb} · ${activeCount} 人桌`}
             </p>
           </div>
-          <button onClick={() => dispatch({ type: 'TO_LOBBY' })} className="text-stone-500 hover:text-stone-300"><X size={18} /></button>
+          <button onClick={() => dispatch({ type: 'TO_LOBBY' })} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-b from-emerald-900 to-emerald-950 border border-emerald-800 p-3 space-y-3 shadow-xl">
-          <div className="grid grid-cols-3 gap-1">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex justify-center">
-                <Seat player={state.players[i]} isHero={false}
-                  showCards={showdownReveal && !state.players[i].folded && !state.players[i].eliminated}
-                  isActor={actorIdx === i && !showdownReveal}
-                  isWinner={showdownReveal && state.winners.includes(i)} />
-              </div>
-            ))}
+        <div className="felt rounded-lg p-3">
+          {/* 圍成一圈：上=對手B、左=對手A、右=對手C、下=你，公牌在正中央 */}
+          <div className="flex justify-center min-h-[4.2rem] items-start">{oppSeat(2)}</div>
+
+          <div className="flex justify-between items-start gap-2 px-1">
+            <div className="flex justify-start">{oppSeat(1)}</div>
+            <div className="flex justify-end">{oppSeat(3)}</div>
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 py-1">
+          <div className="flex flex-col items-center gap-1.5 py-2">
             <div className="flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
               {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-9 h-13 rounded-md border border-dashed border-emerald-700/50" />)}
@@ -945,17 +1696,34 @@ function App() {
             <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
 
-          <div className="flex justify-center pt-1 border-t border-emerald-800/50">
+          <div className="flex justify-center min-h-[5rem] items-end pt-1 border-t border-emerald-800/50">
             <Seat player={hero} isHero={true} showCards={true}
               isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} />
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-900/60 border border-slate-800 px-3 py-2 max-h-20 overflow-y-auto">
-          {state.feed.map((f, i) => <p key={i} className="text-stone-400 text-xs leading-relaxed">{f}</p>)}
-        </div>
+        <ActionFeed feed={state.feed} />
 
-        <AdvicePanel advice={heroActive ? advice : null} show={state.showAdvice} onToggle={() => dispatch({ type: 'TOGGLE_ADVICE' })} />
+        {heroActive && (
+          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg border border-white/10 bg-[#0b0d11]/95 p-1.5 shadow-2xl">
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="tap-target flex-1 min-w-[4rem] rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold whitespace-nowrap px-2">棄牌</button>
+            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="tap-target flex-1 min-w-[4rem] rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
+            <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
+              onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
+          </div>
+        )}
+
+        {state.trainingStyle === 'guided' ? (
+          <AdvicePanel advice={heroActive ? advice : null} show={state.showAdvice} onToggle={() => dispatch({ type: 'TOGGLE_ADVICE' })} />
+        ) : heroActive ? (
+          <div className="rounded-lg border border-amber-400/20 bg-amber-400/[.04] px-3 py-2.5 text-xs text-stone-400 flex items-center gap-2">
+            <Heart size={14} className="text-amber-300" /><span><b className="text-stone-200">先作答模式</b> · 建議與 EV 會在本手覆盤揭曉</span>
+          </div>
+        ) : null}
+
+        {heroActive && state.stage === 'preflop' && advice && advice.strategy && advice.strategy.evIsProxy && (
+          <PreflopRangeGrid pos={hero.position} facingRaise={state.raiseCount > 0} heroCode={handCode(hero.cards)} />
+        )}
 
         {state.stage === 'gameover' ? (
           <div className="rounded-xl border border-rose-800/50 bg-rose-950/40 p-4 text-center space-y-3">
@@ -977,19 +1745,13 @@ function App() {
               <RefreshCw size={16} /> 下一手
             </button>
           </div>
-        ) : heroActive ? (
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="rounded-lg border border-rose-700 text-rose-300 py-2.5 text-sm font-medium">棄牌</button>
-            <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="rounded-lg border border-teal-700 text-teal-300 py-2.5 text-sm font-medium">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
-            <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
-              onBet={(type, amount) => dispatch({ type: 'HERO_ACT', decision: { type, amount } })} />
-          </div>
-        ) : (
+        ) : heroActive ? null : (
           <div className="text-center text-stone-500 text-sm py-2">{state.players[actorIdx]?.name || '對手'} 思考中…</div>
         )}
 
         {state.stats.hands > 0 && <StatBar stats={state.stats} />}
         <HandHistory history={state.history} />
+        <PostflopSpotViewer />
         <p className="text-stone-700 text-[10px] text-center pt-1">個人練習用途 · 非真錢賭博</p>
       </div>
     </div>
