@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -39,6 +39,14 @@
     .icon-well { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 8px; }
     .close-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #292c33; border-radius: 8px; background: #111318; }
     .action-dock { padding-bottom: max(.375rem, env(safe-area-inset-bottom)); backdrop-filter: blur(14px); }
+    .lobby-title { font-family: 'Noto Serif TC', serif; text-shadow: 0 8px 28px rgba(0,0,0,.45); }
+    .lobby-table { position: relative; height: 230px; overflow: hidden; border: 1px solid #8a6b32; border-radius: 48% / 24%; background: #06483b; box-shadow: inset 0 0 0 6px #161513, inset 0 0 0 8px #b18a3f, inset 0 0 42px rgba(0,0,0,.5), 0 26px 55px rgba(0,0,0,.5); }
+    .lobby-table::before { content: ""; position: absolute; inset: 10px; border-radius: inherit; border: 1px solid rgba(232,198,106,.22); background-image: repeating-linear-gradient(30deg, transparent 0 7px, rgba(255,255,255,.018) 7px 8px); }
+    .seat-dot { position: absolute; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #3d4048; border-radius: 50%; background: #15171c; color: #8f9299; box-shadow: 0 7px 16px rgba(0,0,0,.4); font: 600 10px 'Inter', sans-serif; }
+    .preview-card { width: 34px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #d6d3d1; border-radius: 5px; background: #fafaf9; box-shadow: 0 6px 14px rgba(0,0,0,.35); font: 700 12px 'JetBrains Mono', monospace; line-height: 1; }
+    .preview-card.back { border-color: #50545d; background: #1b1e25; color: #d1a947; font-family: Georgia, serif; }
+    .preview-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(232,198,106,.4); border-radius: 999px; background: rgba(5,17,14,.75); padding: 4px 9px; color: #f2cf6d; font: 600 10px 'JetBrains Mono', monospace; box-shadow: 0 7px 18px rgba(0,0,0,.28); }
+    .preview-chip::before { content: ""; width: 10px; height: 10px; border: 2px dotted #f2cf6d; border-radius: 50%; }
     .rounded-xl, .rounded-2xl { border-radius: .5rem !important; }
     @media (prefers-reduced-motion: reduce) {
       .deal-in, .pot-pulse, .win-glow { animation: none !important; }
@@ -1553,29 +1561,51 @@ function ICMDrillMode({ onExit }) {
   );
 }
 
+function PreviewCard({ rank, suit, back, tilt = 0 }) {
+  const red = suit === '♥' || suit === '♦';
+  return <div className={`preview-card ${back ? 'back' : ''}`} style={{ transform: `rotate(${tilt}deg)` }}>
+    {back ? <span>SL</span> : <><span className={red ? 'text-rose-600' : 'text-stone-900'}>{rank}</span><span className={red ? 'text-rose-600' : 'text-stone-900'}>{suit}</span></>}
+  </div>;
+}
+
 function Lobby({ onStart, onDrill, onICM, showAdvice }) {
   const [mode, setMode] = useState('cash');
   const [trainingStyle, setTrainingStyle] = useState('challenge');
   return (
-    <div className="app-shell min-h-full px-4 py-6 sm:py-10" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-md w-full mx-auto space-y-5">
-        <header className="flex items-center gap-4 py-2">
-          <div className="brand-mark">♠</div>
-          <div className="min-w-0">
-            <p className="eyebrow mb-1">Decision training room</p>
-            <h1 className="text-2xl font-bold text-stone-100 leading-none" style={{ fontFamily: "'Fraunces', serif" }}>銀線陪練桌</h1>
-            <p className="mt-1.5 text-stone-500 text-xs">讀懂每個決策，不只看單手輸贏</p>
+    <div className="app-shell min-h-full px-3 pb-7 pt-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md w-full mx-auto space-y-4">
+        <header className="flex items-end justify-between px-2 pb-1">
+          <div>
+            <p className="eyebrow mb-1 text-amber-200/60">Silver Line Poker Lab</p>
+            <h1 className="lobby-title text-[27px] font-bold text-stone-100 leading-tight">銀線陪練桌</h1>
           </div>
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-stone-500"><span className="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf]" /> GTO ENGINE</div>
         </header>
 
-        <section className="space-y-2">
-          <div className="flex items-center justify-between px-0.5"><p className="eyebrow">牌桌對戰</p><span className="text-[10px] text-stone-600">4 人桌 · AI 對手</span></div>
-          <div className="panel rounded-lg p-2.5 space-y-2.5">
+        <div className="lobby-table" aria-label="四人撲克訓練桌預覽">
+          <span className="seat-dot left-1/2 top-4 -translate-x-1/2">AI</span>
+          <span className="seat-dot left-4 top-1/2 -translate-y-1/2">AI</span>
+          <span className="seat-dot right-4 top-1/2 -translate-y-1/2">AI</span>
+          <div className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2">
+            <div className="flex items-center justify-center gap-1">
+              <PreviewCard rank="K" suit="♦" tilt={-2} /><PreviewCard rank="7" suit="♣" /><PreviewCard rank="2" suit="♥" tilt={2} />
+            </div>
+            <div className="mt-2 text-center"><span className="preview-chip">POT 650</span></div>
+          </div>
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
+            <div className="flex justify-center -space-x-1"><PreviewCard rank="A" suit="♠" tilt={-4} /><PreviewCard rank="K" suit="♠" tilt={4} /></div>
+            <span className="mt-1 inline-block rounded-full bg-black/55 px-2 py-0.5 text-[9px] font-semibold text-amber-200">YOU · BTN</span>
+          </div>
+        </div>
+
+        <section className="space-y-2.5">
+          <div className="flex items-center justify-between px-1"><p className="eyebrow">開始一局</p><span className="text-[10px] text-stone-600">4 人桌 · AI 對手</span></div>
+          <div className="space-y-2.5 border-y border-white/[.07] py-3">
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-black/25 p-1" role="tablist" aria-label="賽制模式">
               <button onClick={() => setMode('cash')} className={`tap-target rounded-md text-sm font-semibold transition ${mode === 'cash' ? 'bg-stone-100 text-stone-950 shadow' : 'text-stone-500'}`}>現金桌</button>
               <button onClick={() => setMode('tournament')} className={`tap-target rounded-md text-sm font-semibold transition ${mode === 'tournament' ? 'bg-stone-100 text-stone-950 shadow' : 'text-stone-500'}`}>錦標賽</button>
             </div>
-            <div className="grid grid-cols-2 gap-1 border-t border-white/[.06] pt-2" role="tablist" aria-label="學習方式">
+            <div className="grid grid-cols-2 gap-1" role="tablist" aria-label="學習方式">
               <button onClick={() => setTrainingStyle('challenge')} className={`tap-target rounded-md px-2 text-left ${trainingStyle === 'challenge' ? 'bg-amber-400/10 text-amber-200 ring-1 ring-amber-400/40' : 'text-stone-500'}`}>
                 <b className="block text-xs">先作答</b><span className="block mt-0.5 text-[10px] font-normal opacity-70">覆盤才揭曉答案</span>
               </button>
@@ -1588,30 +1618,24 @@ function Lobby({ onStart, onDrill, onICM, showAdvice }) {
               <span className="text-amber-300" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{mode === 'cash' ? '50 / 100' : 'LEVEL UP'}</span>
             </div>
             <button onClick={() => onStart(mode, trainingStyle)} className="tap-target w-full rounded-lg bg-amber-400 hover:bg-amber-300 text-[#15120a] font-bold px-4 flex items-center justify-between transition">
-              <span className="flex items-center gap-2"><span className="text-base">♠</span> 進入牌桌</span><span aria-hidden="true">→</span>
+              <span className="flex items-center gap-2"><span className="text-base">♠</span> 發牌，開始訓練</span><span aria-hidden="true">→</span>
             </button>
           </div>
         </section>
 
         <section className="space-y-2">
-          <div className="flex items-center justify-between px-0.5"><p className="eyebrow">專項訓練</p><span className="text-[10px] text-stone-600">即時判分</span></div>
-          <div className="grid gap-2.5">
-            <button onClick={onDrill} className="mode-card tap-target rounded-lg p-3.5 text-left flex items-center gap-3 transition">
+          <div className="flex items-center justify-between px-1"><p className="eyebrow">快速特訓</p><span className="text-[10px] text-stone-600">即時判分</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onDrill} className="mode-card tap-target rounded-lg p-3 text-left transition">
               <span className="icon-well bg-teal-950 text-teal-300"><RefreshCw size={18} /></span>
-              <span className="flex-1 min-w-0"><b className="block text-sm text-stone-100">短碼推棄</b><span className="block mt-0.5 text-[11px] text-stone-500">首入／面對全下 · Nash EV</span></span>
-              <span className="text-stone-600">→</span>
+              <b className="mt-3 block text-sm text-stone-100">短碼推棄</b><span className="block mt-0.5 text-[10px] text-stone-500">Nash EV · 同類重練</span>
             </button>
-            <button onClick={onICM} className="mode-card tap-target rounded-lg p-3.5 text-left flex items-center gap-3 transition">
+            <button onClick={onICM} className="mode-card tap-target rounded-lg p-3 text-left transition">
               <span className="icon-well bg-rose-950/70 text-rose-300"><Trophy size={18} /></span>
-              <span className="flex-1 min-w-0"><b className="block text-sm text-stone-100">決賽桌 ICM</b><span className="block mt-0.5 text-[11px] text-stone-500">3 人桌 · 獎金階梯壓力</span></span>
-              <span className="text-stone-600">→</span>
+              <b className="mt-3 block text-sm text-stone-100">決賽桌 ICM</b><span className="block mt-0.5 text-[10px] text-stone-500">獎金階梯 · 出局壓力</span>
             </button>
           </div>
         </section>
-
-        <div className="flex items-center justify-between border-t border-white/[.06] pt-4 text-[10px] text-stone-600">
-          <span>起始籌碼 {STARTING_STACK.toLocaleString()}</span><span>個人練習 · 非真錢遊戲</span>
-        </div>
       </div>
     </div>
   );
