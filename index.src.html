@@ -61,17 +61,21 @@
     .vivid-drill.teal { background: #64d8ce; }
     .vivid-drill.blue { background: #8fb8ff; }
     .vivid-drill:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 #17191d; }
-    .training-shell { min-height: 100%; color: #17191d; background: #edf1ee; }
-    .training-bar { border: 2px solid #17191d; background: #ef5a46; box-shadow: 4px 4px 0 #17191d; }
-    .training-felt { border: 2px solid #17191d !important; box-shadow: inset 0 0 0 5px #174c40, inset 0 0 0 7px #75c6ae, 5px 6px 0 #17191d !important; }
-    .player-avatar { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid #17191d; border-radius: 50%; color: #17191d; background: #f8d748; box-shadow: 2px 2px 0 #17191d; font: 700 13px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
-    .avatar-1 { background: #64d8ce; }.avatar-2 { background: #f8d748; }.avatar-3 { background: #8fb8ff; }.avatar-0 { background: #ef5a46; color: white; }
-    .avatar-acting { transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 3px #fff, 3px 4px 0 #17191d; }
-    .vivid-action { border: 2px solid #17191d; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
-    .vivid-fold { background: #ef5a46 !important; }.vivid-call { background: #64d8ce !important; }.vivid-raise { background: #f8d748 !important; }
-    .training-shell .close-button { border: 2px solid #17191d; background: #fff; color: #17191d; box-shadow: 2px 2px 0 #17191d; }
-    .training-shell .action-dock { border: 2px solid #17191d; background: #fff; box-shadow: 4px 4px 0 #17191d; }
-    .training-shell .bright-panel { border: 2px solid #17191d; background: #fff; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
+    .training-shell { min-height: 100%; color: #f4f6fb; background: radial-gradient(circle at 50% -12%, #18283b 0, #080e19 38%, #030712 76%); }
+    .training-bar { border: 1px solid #253448; background: rgba(10,18,31,.92); box-shadow: 0 12px 32px rgba(0,0,0,.28); backdrop-filter: blur(14px); }
+    .training-felt { border: 7px solid #b9a98d !important; border-radius: 46% / 20% !important; background: radial-gradient(ellipse at center, #08719a 0, #07567d 52%, #073d60 100%) !important; box-shadow: inset 0 0 0 2px rgba(255,255,255,.3), inset 0 0 46px rgba(0,22,42,.48), 0 0 0 3px #526071, 0 22px 45px rgba(0,0,0,.52) !important; }
+    .training-felt::after { content: "SILVER LINE  •  TRAINING TABLE"; position: absolute; left: 50%; top: 49%; transform: translate(-50%,-50%); color: rgba(255,255,255,.15); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .12em; white-space: nowrap; }
+    .player-avatar { position: relative; width: 42px; height: 42px; display: grid; place-items: center; border: 2px solid #718096; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#34465c,#101827); box-shadow: inset 0 1px 5px rgba(255,255,255,.14),0 6px 15px rgba(0,0,0,.4); font: 700 16px Georgia,serif; transition: transform .16s ease, box-shadow .16s ease; }
+    .player-avatar::after { content: ""; position: absolute; width: 16px; height: 7px; bottom: 8px; border-bottom: 2px solid currentColor; border-radius: 50%; opacity: .75; }
+    .avatar-1 { color:#62e6db; background:linear-gradient(145deg,#176b72,#102638) }.avatar-2 { color:#ffd86b; background:linear-gradient(145deg,#725322,#211b22) }.avatar-3 { color:#91b8ff; background:linear-gradient(145deg,#315d9d,#141d38) }.avatar-0 { color:#ff8a78; background:linear-gradient(145deg,#923f45,#2b1722); border-color:#ff8a78 }
+    .avatar-acting { transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 3px #f4c95d,0 0 22px rgba(244,201,93,.6); }
+    .seat-nameplate { border:1px solid rgba(125,147,174,.36); border-radius:999px; background:rgba(4,11,22,.86); padding:2px 7px; box-shadow:0 5px 12px rgba(0,0,0,.28) }
+    .vivid-action { border: 1px solid rgba(255,255,255,.14); color: #f8fafc; box-shadow: 0 8px 18px rgba(0,0,0,.24); }
+    .vivid-fold { background: #263447 !important; }.vivid-call { background: #087f78 !important; }.vivid-raise { background: #e4534b !important; }
+    .vivid-action:active { transform:translateY(1px); filter:brightness(1.08) }
+    .training-shell .close-button { border: 1px solid #34445a; background: #111c2c; color: #aebdce; box-shadow:none; }
+    .training-shell .action-dock { border: 1px solid #2b3b50; background: rgba(8,15,27,.94); box-shadow: 0 12px 35px rgba(0,0,0,.48); }
+    .training-shell .bright-panel { border: 1px solid #29394e; background: rgba(12,22,37,.92); color: #eef3fa; box-shadow: 0 10px 26px rgba(0,0,0,.22); }
     .lobby-shell .lobby-table { border-color: #17191d; box-shadow: inset 0 0 0 6px #174c40, inset 0 0 0 8px #75c6ae, 7px 8px 0 #17191d; animation: tableRise .5s ease-out both; }
     .lobby-shell .seat-dot { border: 2px solid #17191d; background: #f8d748; color: #17191d; box-shadow: 3px 3px 0 #17191d; }
     .lobby-shell .seat-dot:nth-of-type(2) { background: #64d8ce; }
@@ -1032,7 +1036,7 @@ function Seat({ player, isHero, showCards, isActor, isWinner, animate }) {
   return (
     <div className={`flex flex-col items-center gap-1 px-1.5 py-1 rounded-lg transition ${player.folded ? 'opacity-35' : ''} ${isWinner ? 'win-glow' : ''}`}>
       <div className={`player-avatar avatar-${player.idx} ${isActor ? 'avatar-acting' : ''}`}>{isHero ? '♠' : ['','T','L','C'][player.idx]}</div>
-      <div className="flex items-center gap-1 whitespace-nowrap">
+      <div className="seat-nameplate flex items-center gap-1 whitespace-nowrap">
         <span className="text-stone-200 text-[13px] font-medium">{player.name}</span>
         {player.position && <span className={`text-[12px] font-bold ${POS_COLOR[player.position] || 'text-stone-400'}`}>{player.position}</span>}
       </div>
@@ -1293,11 +1297,11 @@ function ActionFeed({ feed }) {
   return (
     <div className="bright-panel rounded-lg overflow-hidden">
       <button onClick={() => setOpen(!open)} className="tap-target w-full flex items-center justify-between gap-3 px-3 text-left">
-        <span className="min-w-0 truncate text-xs text-[#555b59]"><b className="mr-2 text-[#17191d] font-bold">最新</b>{latest}</span>
+        <span className="min-w-0 truncate text-xs text-slate-300"><b className="mr-2 text-white font-bold">最新</b>{latest}</span>
         {open ? <ChevronUp size={15} className="shrink-0 text-stone-600" /> : <ChevronDown size={15} className="shrink-0 text-stone-600" />}
       </button>
       {open && <div className="max-h-36 overflow-y-auto border-t border-black/10 px-3 py-2">
-        {feed.map((f, i) => <p key={i} className={`text-xs leading-relaxed ${i === feed.length - 1 ? 'text-[#17191d]' : 'text-[#7b817e]'}`}>{f}</p>)}
+        {feed.map((f, i) => <p key={i} className={`text-xs leading-relaxed ${i === feed.length - 1 ? 'text-slate-100' : 'text-slate-500'}`}>{f}</p>)}
       </div>}
     </div>
   );
@@ -1340,8 +1344,8 @@ function BetControl({ stage, pot, bb, currentBet, heroCommitted, heroStack, last
   return (
     <div className="bright-panel w-full rounded-lg p-3 space-y-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-[#555b59] text-xs">{label}至</span>
-        <span className="text-[#17191d] font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
+        <span className="text-slate-400 text-xs">{label}至</span>
+        <span className="text-white font-bold" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{amount.toLocaleString()}</span>
       </div>
       <input type="range" className="w-full" min={minRaiseTo} max={maxTotal} step={10} value={amount} onChange={e => setAmount(clamp(Number(e.target.value)))} />
       <div className="grid grid-cols-4 gap-1.5">
@@ -1727,8 +1731,8 @@ function App() {
   );
 
   return (
-    <div className="training-shell px-3 py-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-md mx-auto space-y-3">
+    <div className="training-shell px-3 py-3" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="max-w-md mx-auto space-y-3 pb-3">
         <div className="training-bar rounded-lg flex items-center justify-between px-3 py-2">
           <div>
             <h1 className="font-bold text-lg text-white" style={{ fontFamily: "'Noto Serif TC', serif" }}>銀線陪練桌</h1>
@@ -1739,16 +1743,16 @@ function App() {
           <button onClick={() => dispatch({ type: 'TO_LOBBY' })} aria-label="返回大廳" className="close-button text-stone-500 hover:text-stone-200"><X size={18} /></button>
         </div>
 
-        <div className="felt training-felt rounded-lg p-3">
+        <div className="felt training-felt px-3 py-4">
           {/* 圍成一圈：上=對手B、左=對手A、右=對手C、下=你，公牌在正中央 */}
-          <div className="flex justify-center min-h-[4.2rem] items-start">{oppSeat(2)}</div>
+          <div className="flex justify-center min-h-[4.4rem] items-start">{oppSeat(2)}</div>
 
           <div className="flex justify-between items-start gap-2 px-1">
             <div className="flex justify-start">{oppSeat(1)}</div>
             <div className="flex justify-end">{oppSeat(3)}</div>
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 py-2">
+          <div className="flex flex-col items-center gap-1.5 py-3">
             <div className="flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
               {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-9 h-13 rounded-md border border-dashed border-emerald-700/50" />)}
@@ -1756,7 +1760,7 @@ function App() {
             <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
 
-          <div className="flex justify-center min-h-[5rem] items-end pt-1 border-t border-emerald-800/50">
+          <div className="flex justify-center min-h-[5.4rem] items-end pt-1 border-t border-white/10">
             <Seat player={hero} isHero={true} showCards={true}
               isActor={heroActive} isWinner={showdownReveal && state.winners.includes(0)} />
           </div>
@@ -1765,7 +1769,7 @@ function App() {
         <ActionFeed feed={state.feed} />
 
         {heroActive && (
-          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg p-1.5">
+          <div className="action-dock sticky bottom-2 z-20 flex flex-wrap gap-2 rounded-lg p-2">
             <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: 'fold' } })} className="vivid-action vivid-fold tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">棄牌</button>
             <button onClick={() => dispatch({ type: 'HERO_ACT', decision: { type: canCheck ? 'check' : 'call' } })} className="vivid-action vivid-call tap-target flex-1 min-w-[4rem] rounded-lg text-sm font-semibold whitespace-nowrap px-2">{canCheck ? '過牌' : `跟注 ${callAmt}`}</button>
             <BetControl stage={state.stage} pot={state.pot} bb={state.bb} currentBet={state.currentBet} heroCommitted={hero.committed} heroStack={hero.stack} lastRaiseSize={state.lastRaiseSize}
