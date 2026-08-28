@@ -72,7 +72,9 @@
     .table-seat-left { left:-8px; top:43%; transform:translateY(-50%) }
     .table-seat-right { right:-8px; top:43%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
-    .table-center { position:absolute !important; z-index:1; left:50%; top:51%; width:100%; transform:translate(-50%,-50%) }
+    .table-center { position:absolute !important; z-index:1; inset:0; pointer-events:none }
+    .community-cards { position:absolute !important; left:50%; top:50%; transform:translate(-50%,-50%) }
+    .table-pot { position:absolute !important; left:50%; top:calc(50% + 44px); transform:translateX(-50%); white-space:nowrap }
     .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid #667085; background:radial-gradient(circle at 30% 18%,#293242 0,#121823 42%,#06090f 100%); box-shadow:0 7px 16px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.08) }
     .playing-card::before { content:""; position:absolute; inset:4px; border:1px solid currentColor; border-radius:4px; opacity:.2 }
     .playing-card::after { content:attr(data-suit); position:absolute; right:-3px; bottom:-10px; color:currentColor; font:700 42px Georgia,serif; opacity:.12 }
@@ -1761,12 +1763,12 @@ function App() {
           <div className="table-seat table-seat-left">{oppSeat(1)}</div>
           <div className="table-seat table-seat-right">{oppSeat(3)}</div>
 
-          <div className="table-center flex flex-col items-center gap-2">
-            <div className="flex gap-1 min-h-[3.2rem]">
+          <div className="table-center">
+            <div className="community-cards flex gap-1 min-h-[3.2rem]">
               {state.board.map((c, i) => <CardFace key={c.r + c.s} card={c} size="md" animate />)}
               {Array.from({ length: 5 - state.board.length }).map((_, i) => <div key={i} className="w-12 h-[4.25rem] rounded-md border border-dashed border-sky-300/20 bg-slate-950/10" />)}
             </div>
-            <div key={state.pot} className="flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
+            <div key={state.pot} className="table-pot flex items-center gap-1.5 text-amber-400 text-sm font-medium pot-pulse"><Coins size={14} /> 底池 {state.pot.toLocaleString()}</div>
           </div>
 
           <div className="table-seat table-seat-hero">
