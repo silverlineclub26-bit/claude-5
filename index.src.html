@@ -72,7 +72,7 @@
     .table-seat-left { left:-8px; top:50%; transform:translateY(-50%) }
     .table-seat-right { right:-8px; top:50%; transform:translateY(-50%) }
     .table-seat-hero { left:50%; bottom:-4px; width:150px; transform:translateX(-50%) }
-    .table-center { position:absolute !important; z-index:1; left:50%; top:51%; width:100%; transform:translate(-50%,-50%) }
+    .table-center { position:absolute !important; z-index:1; left:50%; top:38%; width:100%; transform:translate(-50%,-50%) }
     .playing-card { position:relative; overflow:hidden; flex:none; border:1px solid #667085; background:radial-gradient(circle at 30% 18%,#293242 0,#121823 42%,#06090f 100%); box-shadow:0 7px 16px rgba(0,0,0,.48),inset 0 0 0 1px rgba(255,255,255,.08) }
     .playing-card::before { content:""; position:absolute; inset:4px; border:1px solid currentColor; border-radius:4px; opacity:.2 }
     .playing-card::after { content:attr(data-suit); position:absolute; right:-3px; bottom:-10px; color:currentColor; font:700 42px Georgia,serif; opacity:.12 }
@@ -136,6 +136,7 @@ const SUITS = ['s','h','d','c'];
 const SUIT_IDX = { s: 0, h: 1, d: 2, c: 3 };
 const SUIT_SYMBOL = { s: '♠', h: '♥', d: '♦', c: '♣' };
 const SUIT_RED = { s: false, h: true, d: true, c: false };
+const SUIT_COLOR = { s: '#eef4ff', h: '#ff5b6e', d: '#52b8ff', c: '#56d69a' };
 
 function makeDeck() {
   const deck = [];
@@ -1026,9 +1027,8 @@ function CardFace({ card, hidden, size = 'md', dim, animate }) {
   if (hidden) {
     return <div className={`${dims} ${anim} card-back rounded-md ${dim ? 'opacity-40' : ''}`} aria-label="牌背" />;
   }
-  const red = SUIT_RED[card.s];
   return (
-    <div data-suit={SUIT_SYMBOL[card.s]} className={`${dims} ${anim} playing-card rounded-md flex flex-col items-center justify-center font-bold leading-none ${red ? 'text-[#ff5b6e]' : 'text-[#eef4ff]'} ${dim ? 'opacity-40' : ''}`}>
+    <div data-suit={SUIT_SYMBOL[card.s]} style={{ color: SUIT_COLOR[card.s] }} className={`${dims} ${anim} playing-card rounded-md flex flex-col items-center justify-center font-bold leading-none ${dim ? 'opacity-40' : ''}`}>
       <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{card.r}</span>
       <span className="mt-1 text-[.9em]">{SUIT_SYMBOL[card.s]}</span>
     </div>
@@ -1210,7 +1210,7 @@ function PostflopSpotViewer() {
             <>
               <div className="flex items-center gap-2 text-xs text-stone-300">
                 <span>單加注底池 · BTN vs BB · 翻牌</span>
-                <span className="flex gap-1">{board.map((c, i) => <span key={i} className={SUIT_RED[c.s] ? 'text-rose-400' : 'text-stone-100'}>{c.r}{SUIT_SYMBOL[c.s]}</span>)}</span>
+                <span className="flex gap-1">{board.map((c, i) => <span key={i} style={{ color: SUIT_COLOR[c.s] }}>{c.r}{SUIT_SYMBOL[c.s]}</span>)}</span>
               </div>
               <div className="grid gap-px" style={{ gridTemplateColumns: 'repeat(13, 1fr)' }}>{cells}</div>
               {selectedCode && spot.strategy[selectedCode] && <div className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs">
@@ -1237,7 +1237,7 @@ function ReviewPanel({ lines }) {
   if (!lines || lines.length === 0) return null;
   return (
     <div className="rounded-xl border border-amber-700/40 bg-amber-950/30 px-4 py-3 space-y-1.5">
-      <p className="text-amber-300 text-sm font-semibold flex items-center gap-1.5"><Heart size={15} /> 教練覆盤</p>
+      <p className="text-amber-300 text-sm font-semibold flex items-center gap-1.5"><Heart size={15} /> 本手短評</p>
       {lines.map((l, i) => <p key={i} className="text-amber-100/85 text-xs leading-relaxed">{l}</p>)}
     </div>
   );
@@ -1716,7 +1716,7 @@ function App() {
     if (actorIdx !== 0 && actorIdx !== undefined) {
       // 你已棄牌/出局→這手對你已結束，快轉剩下的機器人流程，直接跳到教練覆盤＋下一手
       const heroOut = state.players[0] && (state.players[0].folded || state.players[0].eliminated);
-      const delay = heroOut ? 550 + Math.random() * 300 : 900 + Math.random() * 600;
+      const delay = heroOut ? 60 : 900 + Math.random() * 600;
       botTimer.current = setTimeout(() => dispatch({ type: 'BOT_ACT' }), delay);
       return () => clearTimeout(botTimer.current);
     }
